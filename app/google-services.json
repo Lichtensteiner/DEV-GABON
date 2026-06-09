@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "605217734266",
+    "project_id": "dev-gabon",
+    "storage_bucket": "dev-gabon.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:605217734266:android:eba597a85292047e8405c3",
+        "android_client_info": {
+          "package_name": "com.dev.Gabon"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCPROcDIHTu0cT7IPNuvGma3G471nbXje4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

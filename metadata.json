@@ -1,0 +1,6 @@
+{
+  "name": "DEV GABON",
+  "description": "Le réseau social professionnel des développeurs et métiers du numérique au Gabon. Partage d'articles, offres d'emploi IT, groupes techniques, projets collaboratifs, messagerie et événements.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
