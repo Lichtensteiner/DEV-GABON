@@ -352,7 +352,7 @@ fun LandingPageScreen(viewModel: DevGabonViewModel) {
                 // Item 0: Hero Section
                 item {
                     val onGetClick = if (isLoggedIn) { { viewModel.navigateTo(Screen.Feed) } } else { { showGoogleLoginDialog = true } }
-                    HeroSection(colors = colors, languageCode = languageCode, onGetStarted = onGetClick)
+                    HeroSection(colors = colors, languageCode = languageCode, onGetStarted = onGetClick, isLoggedIn = isLoggedIn)
                 }
 
                 // Item 1: Mission Section
@@ -408,7 +408,7 @@ fun LandingPageScreen(viewModel: DevGabonViewModel) {
 }
 
 @Composable
-fun HeroSection(colors: ColorScheme, languageCode: String, onGetStarted: () -> Unit) {
+fun HeroSection(colors: ColorScheme, languageCode: String, onGetStarted: () -> Unit, isLoggedIn: Boolean) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -487,7 +487,14 @@ fun HeroSection(colors: ColorScheme, languageCode: String, onGetStarted: () -> U
                 ) {
                     Icon(Icons.Default.AccountCircle, contentDescription = "Google Sign In", modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text(text = if (languageCode == "FR") "Rejoindre via Google" else "Join with Google", fontSize = 13.sp)
+                    Text(
+                        text = if (isLoggedIn) {
+                            if (languageCode == "FR") "Rejoindre le Réseau" else "Rejoin Network"
+                        } else {
+                            if (languageCode == "FR") "Se connecter via Google" else "Connect with Google"
+                        },
+                        fontSize = 13.sp
+                    )
                 }
             }
 
@@ -1197,28 +1204,6 @@ fun GoogleLoginDialog(
                     }
 
                     Spacer(Modifier.height(14.dp))
-                    
-                    // Demo Login Button as requested for seamless testing
-                    TextButton(
-                        onClick = {
-                            viewModel.loginWithGoogle(
-                                email = "ludo.consulting3@gmail.com",
-                                fullName = "Martinien Ludovic Mve Zogo",
-                                pseudo = "ludodev",
-                                profilePic = "https://api.dicebear.com/7.x/pixel-art/png?seed=ludodev"
-                            )
-                            onDismiss()
-                        }
-                    ) {
-                        Text(
-                            text = if (languageCode == "FR") "Connexion Démo Rapide" else "Quick Demo Login",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = colors.secondary
-                        )
-                    }
-
-                    Spacer(Modifier.height(6.dp))
 
                     TextButton(onClick = onDismiss) {
                         Text(
