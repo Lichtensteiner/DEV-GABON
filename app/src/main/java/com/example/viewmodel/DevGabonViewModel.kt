@@ -32,6 +32,41 @@ sealed interface Screen {
 
 class DevGabonViewModel(private val repository: DevGabonRepository) : ViewModel() {
 
+    // --- Application Startup Loading Context ---
+    private val _isStartupLoading = MutableStateFlow(true)
+    val isStartupLoading: StateFlow<Boolean> = _isStartupLoading.asStateFlow()
+
+    private val _startupProgress = MutableStateFlow(0f)
+    val startupProgress: StateFlow<Float> = _startupProgress.asStateFlow()
+
+    private val _startupStatusText = MutableStateFlow("Initialisation...")
+    val startupStatusText: StateFlow<String> = _startupStatusText.asStateFlow()
+
+    init {
+        // Run a simulated loading of database entities and profiles, incrementing progress beautifully
+        viewModelScope.launch {
+            val statusTexts = listOf(
+                "Démarrage de DEV GABON...",
+                "Connexion à la base de données locale...",
+                "Chargement des profils de la communauté...",
+                "Synchronisation des publications et actualités...",
+                "Préparation de votre espace professionnel...",
+                "Prêt à coder ! 🚀"
+            )
+            val steps = 25
+            for (i in 1..steps) {
+                kotlinx.coroutines.delay(80) // 25 * 80ms = 2.0s total load
+                _startupProgress.value = i.toFloat() / steps
+                
+                val textIdx = ((i - 1) * statusTexts.size) / steps
+                if (textIdx in statusTexts.indices) {
+                    _startupStatusText.value = statusTexts[textIdx]
+                }
+            }
+            _isStartupLoading.value = false
+        }
+    }
+
     // --- Theme & Language Context ---
     private val _isDarkTheme = MutableStateFlow(true)
     val isDarkTheme: StateFlow<Boolean> = _isDarkTheme.asStateFlow()
@@ -73,8 +108,16 @@ class DevGabonViewModel(private val repository: DevGabonRepository) : ViewModel(
                     role = role
                 )
                 repository.createProfile(newProfile)
+            } else {
+                // Instantly update the existing local database entry with real-time Google account credentials
+                repository.createProfile(existing.copy(
+                    fullName = fullName,
+                    profilePicture = profilePic,
+                    pseudo = if (existing.pseudo.isBlank() || existing.pseudo == "MartiDev" || existing.pseudo == "ludodev") pseudo else existing.pseudo
+                ))
             }
             _isLoggedIn.value = true
+            _currentScreen.value = Screen.Profile
         }
     }
 
@@ -141,7 +184,7 @@ class DevGabonViewModel(private val repository: DevGabonRepository) : ViewModel(
     }
 
     // --- Active User Context ---
-    private val _activeUserEmail = MutableStateFlow("ludo.consulting3@gmail.com")
+    private val _activeUserEmail = MutableStateFlow("")
     val activeUserEmail: StateFlow<String> = _activeUserEmail.asStateFlow()
 
     val activeUserProfile: StateFlow<UserProfileEntity?> = _activeUserEmail

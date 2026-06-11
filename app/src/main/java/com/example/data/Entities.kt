@@ -2,8 +2,9 @@ package com.example.data
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import androidx.room.Index
 
-@Entity(tableName = "user_profiles")
+@Entity(tableName = "user_profiles", indices = [Index(value = ["email"], unique = true)])
 data class UserProfileEntity(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val email: String,

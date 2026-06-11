@@ -384,7 +384,7 @@ fun LandingPageScreen(viewModel: DevGabonViewModel) {
 
                 // Item 6: Auteur & Team Section
                 item {
-                    AuthorSection(colors = colors, languageCode = languageCode)
+                    AuthorSection(viewModel = viewModel, colors = colors, languageCode = languageCode)
                 }
 
                 // Item 7: Footer
@@ -891,45 +891,152 @@ fun ContextSection(colors: ColorScheme, languageCode: String) {
 }
 
 @Composable
-fun AuthorSection(colors: ColorScheme, languageCode: String) {
+fun AuthorSection(viewModel: DevGabonViewModel, colors: ColorScheme, languageCode: String) {
+    val isLoggedIn by viewModel.isLoggedIn.collectAsState()
+    val activeProfile by viewModel.activeUserProfile.collectAsState()
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(24.dp),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = colors.surfaceVariant.copy(alpha = 0.3f))
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isLoggedIn && activeProfile != null) 
+                colors.primaryContainer.copy(alpha = 0.2f) 
+            else colors.surfaceVariant.copy(alpha = 0.3f)
+        )
     ) {
-        Column(modifier = Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Surface(
-                shape = CircleShape,
-                color = colors.secondary.copy(alpha = 0.15f),
-                modifier = Modifier.size(64.dp)
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Text("🇬🇦", fontSize = 38.sp)
-                }
-            }
-            Spacer(Modifier.height(12.dp))
-            Text(
-                text = "M. Mve Zogo Ludovic Martinien",
-                fontWeight = FontWeight.Bold,
-                fontSize = 16.sp,
-                color = colors.onSurface
-            )
-            Text(
-                text = "Ingénieur Logiciel & Dev lichtensteiner",
-                fontSize = 12.sp,
-                color = colors.onSurfaceVariant
-            )
-
-            Divider(modifier = Modifier.padding(vertical = 12.dp), color = colors.outline.copy(alpha = 0.2f))
-
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                AssistChip(
-                    onClick = {},
-                    label = { Text("ludo.consulting3@gmail.com", fontSize = 10.sp) },
-                    leadingIcon = { Icon(Icons.Default.Email, "", modifier = Modifier.size(12.dp)) }
+        Column(modifier = Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            if (isLoggedIn && activeProfile != null) {
+                val profile = activeProfile!!
+                // REAL-TIME CONNECTED USER PROFILE CARD ACCORDING TO USER STATE
+                Text(
+                    text = if (languageCode == "FR") "VOTRE PROFIL CONNECTE (TEMPS RÉEL)" else "YOUR CONNECTED PROFILE (REAL-TIME)",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = colors.primary,
+                    letterSpacing = 1.sp,
+                    modifier = Modifier.padding(bottom = 12.dp)
                 )
+
+                Box(
+                    modifier = Modifier
+                        .size(90.dp)
+                        .clip(CircleShape)
+                        .border(3.dp, colors.primary, CircleShape)
+                        .background(colors.surface),
+                    contentAlignment = Alignment.Center
+                ) {
+                    ProfileImage(
+                        picture = profile.profilePicture,
+                        size = 84.dp
+                    )
+                }
+
+                Spacer(Modifier.height(14.dp))
+
+                Text(
+                    text = profile.fullName,
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 20.sp,
+                    color = colors.onSurface,
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(Modifier.height(4.dp))
+
+                Text(
+                    text = "@${profile.pseudo}",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = colors.secondary,
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(Modifier.height(4.dp))
+
+                Text(
+                    text = profile.bio.ifBlank { if (languageCode == "FR") "Membre actif de la communauté DevGabon." else "Active member of the DevGabon community." },
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = colors.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                )
+
+                HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp), color = colors.outline.copy(alpha = 0.15f))
+
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    AssistChip(
+                        onClick = {},
+                        label = { Text(profile.email, fontSize = 12.sp, fontWeight = FontWeight.Bold) },
+                        leadingIcon = { Icon(Icons.Default.Email, "", modifier = Modifier.size(14.dp)) },
+                        shape = RoundedCornerShape(10.dp)
+                    )
+                    
+                    TextButton(onClick = { viewModel.navigateTo(Screen.Profile) }) {
+                        Text(
+                            text = if (languageCode == "FR") "Gérer mon profil" else "Manage Profile",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = colors.primary
+                        )
+                    }
+                }
+            } else {
+                // Elegant framed profile photo using the real resident resource: ludodev
+                Box(
+                    modifier = Modifier
+                        .size(90.dp)
+                        .clip(CircleShape)
+                        .border(3.dp, colors.primary, CircleShape)
+                        .background(colors.surfaceVariant),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Image(
+                        painter = painterResource(id = R.mipmap.ludodev),
+                        contentDescription = "M. Mve Zogo Ludovic Martinien",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                    )
+                }
+                Spacer(Modifier.height(14.dp))
+                Text(
+                    text = "M. Mve Zogo Ludovic Martinien",
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 18.sp,
+                    color = colors.onSurface,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = "Ingénieur Logiciel & Dev lichtensteiner",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = colors.primary,
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = "Fondateur & Créateur de DEV GABON",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = colors.onSurfaceVariant.copy(alpha = 0.7f),
+                    textAlign = TextAlign.Center,
+                    letterSpacing = 0.5.sp
+                )
+
+                HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp), color = colors.outline.copy(alpha = 0.15f))
+
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    AssistChip(
+                        onClick = {},
+                        label = { Text("ludo.consulting3@gmail.com", fontSize = 11.sp) },
+                        leadingIcon = { Icon(Icons.Default.Email, "", modifier = Modifier.size(14.dp)) },
+                        shape = RoundedCornerShape(10.dp)
+                    )
+                }
             }
         }
     }
@@ -1058,7 +1165,6 @@ fun BadgeHeader(title: String, colors: ColorScheme) {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GoogleLoginDialog(
     viewModel: DevGabonViewModel,
@@ -1067,149 +1173,345 @@ fun GoogleLoginDialog(
 ) {
     val colors = MaterialTheme.colorScheme
     val context = androidx.compose.ui.platform.LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+
+    var isVerifying by remember { mutableStateOf(true) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    var errorCode by remember { mutableStateOf<Int?>(null) }
+
+    // Simulation state for headless test bypass inside the error screen
+    var isSimulating by remember { mutableStateOf(false) }
+    var simEmail by remember { mutableStateOf("") }
+    var simName by remember { mutableStateOf("") }
+    var simPseudo by remember { mutableStateOf("") }
 
     val googleSignInLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult()
+        contract = androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
     ) { result ->
         val data = result.data
-        if (data != null) {
-            val task = GoogleSignIn.getSignedInAccountFromIntent(data)
-            try {
-                val account = task.getResult(ApiException::class.java)
-                if (account != null) {
-                    val email = account.email ?: ""
-                    val name = account.displayName ?: ""
-                    val photoUrl = account.photoUrl?.toString() ?: ""
-                    val pseudo = if (email.isNotEmpty()) email.substringBefore("@") else "User"
+        if (data == null) {
+            errorMessage = if (languageCode == "FR") 
+                "Aucun retour d'autorisation reçu des services Google Play (Action possiblement annulée)." 
+                else "No authorization response from Google Play Services."
+            isVerifying = false
+            return@rememberLauncherForActivityResult
+        }
 
-                    if (email.isNotBlank() && name.isNotBlank()) {
-                        val finalPic = if (photoUrl.isNotEmpty()) photoUrl else "https://api.dicebear.com/7.x/pixel-art/png?seed=${pseudo.trim()}"
+        val task = com.google.android.gms.auth.api.signin.GoogleSignIn.getSignedInAccountFromIntent(data)
+        try {
+            val account = task.getResult(com.google.android.gms.common.api.ApiException::class.java)
+            if (account != null) {
+                val email = account.email ?: ""
+                val name = account.displayName ?: ""
+                val customPhoto = account.photoUrl?.toString() ?: ""
+                var pseudo = if (email.isNotEmpty()) email.substringBefore("@") else "user"
+
+                if (email.isNotBlank() && name.isNotBlank()) {
+                    val finalPic = if (customPhoto.isNotEmpty()) customPhoto else "https://api.dicebear.com/7.x/pixel-art/png?seed=${pseudo.trim()}"
+                    coroutineScope.launch {
                         viewModel.loginWithGoogle(
                             email = email.trim(),
                             fullName = name.trim(),
-                            pseudo = if (pseudo.isBlank()) "Dev" else pseudo.trim(),
+                            pseudo = pseudo.trim(),
                             profilePic = finalPic
                         )
+                        isVerifying = false
                         onDismiss()
                     }
+                } else {
+                    errorMessage = if (languageCode == "FR") 
+                        "Données de compte incomplètes (email ou nom manquant)." 
+                        else "Incomplete account details (email or display name missing)."
+                    isVerifying = false
                 }
-            } catch (e: Exception) {
-                Log.e("GoogleLoginDialog", "Google Sign-In failed: ${e.localizedMessage}", e)
+            } else {
+                errorMessage = if (languageCode == "FR") 
+                    "Échec de l'authentification Google (Compte introuvable)." 
+                    else "Google sign-in returned no active account."
+                isVerifying = false
             }
+        } catch (e: com.google.android.gms.common.api.ApiException) {
+            val status = e.statusCode
+            errorCode = status
+            android.util.Log.e("DevGabonGoogleAuth", "ApiException code: $status", e)
+            errorMessage = when (status) {
+                10 -> if (languageCode == "FR") {
+                    "Erreur de configuration Firebase (DEVELOPER_ERROR - Code 10).\n\nL'empreinte SHA-1 de votre clé de signature d'application n'est pas encore enregistrée dans les paramètres de votre console Firebase (https://console.firebase.google.com/)."
+                } else {
+                    "Firebase Config Error (DEVELOPER_ERROR - Code 10).\n\nYour application's SHA-1 signing fingerprint is not yet registered in your Firebase console project settings (https://console.firebase.google.com/)."
+                }
+                7 -> if (languageCode == "FR") "Erreur de réseau (NETWORK_ERROR). Vérifiez votre connexion Internet." else "Network error. Please check your connection."
+                12501 -> if (languageCode == "FR") "La connexion Google a été annulée par l'utilisateur." else "Google Sign-In was canceled by the user."
+                else -> if (languageCode == "FR") "Erreur API Google Sign-In (Code $status) : ${e.localizedMessage ?: "Inconnu"}" else "Google API Error (Code $status): ${e.localizedMessage ?: "Unknown"}"
+            }
+            isVerifying = false
+        } catch (e: Exception) {
+            android.util.Log.e("DevGabonGoogleAuth", "Generic Sign-In Exception", e)
+            errorMessage = e.localizedMessage ?: "Unknown connection error"
+            isVerifying = false
         }
     }
 
-    Dialog(onDismissRequest = onDismiss) {
+    fun startGoogleFlow() {
+        isVerifying = true
+        errorMessage = null
+        errorCode = null
+        isSimulating = false
+        try {
+            val gso = com.google.android.gms.auth.api.signin.GoogleSignInOptions.Builder(com.google.android.gms.auth.api.signin.GoogleSignInOptions.DEFAULT_SIGN_IN)
+                .requestEmail()
+                .requestProfile()
+                .build()
+            val googleSignInClient = com.google.android.gms.auth.api.signin.GoogleSignIn.getClient(context, gso)
+            googleSignInClient.signOut().addOnCompleteListener {
+                googleSignInLauncher.launch(googleSignInClient.signInIntent)
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("DevGabonGoogleAuth", "Failed to construct Google Sign In client", e)
+            errorMessage = if (languageCode == "FR") {
+                "Impossible d'exécuter Google Sign-In : ${e.localizedMessage}"
+            } else {
+                "Could not initialize Google Sign-In client: ${e.localizedMessage}"
+            }
+            isVerifying = false
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        startGoogleFlow()
+    }
+
+    Dialog(onDismissRequest = { if (!isVerifying) onDismiss() }) {
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(4.dp),
-            shape = RoundedCornerShape(20.dp),
+                .padding(12.dp),
+            shape = RoundedCornerShape(24.dp),
             colors = CardDefaults.cardColors(containerColor = colors.surface),
-            border = BorderStroke(1.dp, colors.outline.copy(alpha = 0.2f))
+            border = BorderStroke(1.dp, colors.outline.copy(alpha = 0.15f))
         ) {
             Column(
                 modifier = Modifier
-                    .padding(20.dp)
-                    .verticalScroll(rememberScrollState()),
+                    .padding(24.dp)
+                    .fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Branded Google Authentication Header
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Center
-                ) {
+                if (isVerifying) {
                     Box(
                         modifier = Modifier
-                            .size(26.dp)
-                            .background(Color.White, CircleShape)
-                            .border(1.dp, Color.LightGray.copy(alpha = 0.4f), CircleShape),
+                            .size(54.dp)
+                            .background(colors.primaryContainer.copy(alpha = 0.2f), CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text("G", fontWeight = FontWeight.Bold, color = Color(0xFF4285F4), fontSize = 15.sp)
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(32.dp),
+                            color = colors.primary,
+                            strokeWidth = 3.dp
+                        )
                     }
-                    Spacer(Modifier.width(10.dp))
+                    Spacer(Modifier.height(18.dp))
                     Text(
-                        text = if (languageCode == "FR") "Connexion via Google" else "Google Sign-In",
-                        fontWeight = FontWeight.ExtraBold,
-                        fontSize = 17.sp,
-                        color = colors.onSurface
+                        text = if (languageCode == "FR") "Connexion via Google..." else "Connecting via Google...",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp,
+                        color = colors.onSurface,
+                        textAlign = TextAlign.Center
                     )
-                }
-
-                Spacer(Modifier.height(14.dp))
-
-                // Google redirection step
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = colors.primaryContainer.copy(alpha = 0.25f),
-                        modifier = Modifier.fillMaxWidth()
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        text = if (languageCode == "FR") "Veuillez choisir un compte dans le sélecteur officiel" else "Please select an account in the official pop-up",
+                        fontSize = 11.sp,
+                        color = colors.onSurfaceVariant,
+                        textAlign = TextAlign.Center
+                    )
+                } else if (isSimulating) {
+                    // Simulating mode inside the login dialog (Bypass for headless environments)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
                     ) {
-                        Column(modifier = Modifier.padding(14.dp)) {
-                            Text(
-                                text = if (languageCode == "FR") 
-                                    "DEV GABON s'authentifie directement via le service de connexion unique Google Accounts, garantissant que votre compte utilise une adresse valide."
-                                    else "DEV GABON authenticates utilizing the official secure Google Accounts single sign-on system.",
-                                fontSize = 11.sp,
-                                color = colors.onSurface,
-                                lineHeight = 15.sp,
-                                fontWeight = FontWeight.Medium
-                            )
-                            Spacer(Modifier.height(6.dp))
-                            Text(
-                                text = if (languageCode == "FR") 
-                                    "Cliquez sur le bouton ci-dessous pour ouvrir le portail Google sécurisé dans votre navigateur et authentifier votre compte réel."
-                                    else "Tap below to connect securely to your verified Google account inside your mobile browser.",
-                                fontSize = 10.sp,
-                                color = colors.onSurfaceVariant,
-                                lineHeight = 14.sp
-                            )
+                        Box(
+                            modifier = Modifier
+                                .size(28.dp)
+                                .background(Color.White, CircleShape)
+                                .border(1.dp, Color(0xFFE0E0E0), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("G", fontWeight = FontWeight.Black, color = Color(0xFF4285F4), fontSize = 14.sp)
                         }
-                    }
-
-                    Spacer(Modifier.height(24.dp))
-
-                    // Connect Button representing raw Google Auth Single Sign-On Redirect flow
-                    Button(
-                        onClick = {
-                            try {
-                                val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-                                    .requestEmail()
-                                    .requestProfile()
-                                    .build()
-                                val googleSignInClient = GoogleSignIn.getClient(context, gso)
-                                googleSignInClient.signOut().addOnCompleteListener {
-                                    val signInIntent = googleSignInClient.signInIntent
-                                    googleSignInLauncher.launch(signInIntent)
-                                }
-                            } catch (e: Exception) {
-                                Log.e("GoogleSignIn", "Failure launching play services auth", e)
-                            }
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(48.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = colors.primary),
-                        shape = RoundedCornerShape(10.dp)
-                    ) {
-                        Icon(Icons.Default.AccountCircle, contentDescription = "", modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
                         Text(
-                            text = if (languageCode == "FR") "S'authentifier via Google" else "Authorize Google Account",
+                            text = if (languageCode == "FR") "Simulation de Compte Réel" else "Real Account Simulation",
                             fontWeight = FontWeight.Bold,
-                            fontSize = 12.sp
+                            fontSize = 16.sp,
+                            color = colors.onSurface
                         )
                     }
 
-                    Spacer(Modifier.height(14.dp))
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = if (languageCode == "FR") {
+                            "Indiquez vos identifiants réels pour créer votre propre profil avec 0 abonné de départ."
+                        } else {
+                            "Specify your real details to create your custom profile starting with 0 followers."
+                        },
+                        fontSize = 11.sp,
+                        color = colors.onSurfaceVariant,
+                        textAlign = TextAlign.Center
+                    )
 
-                    TextButton(onClick = onDismiss) {
+                    Spacer(Modifier.height(16.dp))
+
+                    OutlinedTextField(
+                        value = simName,
+                        onValueChange = { simName = it },
+                        label = { Text(if (languageCode == "FR") "Votre nom et prénom réels" else "Your Real Full Name") },
+                        placeholder = { Text("Ex: Martinien Ludovic") },
+                        singleLine = true,
+                        leadingIcon = { Icon(Icons.Default.Person, null, modifier = Modifier.size(18.dp)) },
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Spacer(Modifier.height(10.dp))
+
+                    OutlinedTextField(
+                        value = simEmail,
+                        onValueChange = { simEmail = it },
+                        label = { Text(if (languageCode == "FR") "Votre Adresse E-mail Google" else "Your Google Email") },
+                        placeholder = { Text("Ex: ludo.consulting3@gmail.com") },
+                        singleLine = true,
+                        leadingIcon = { Icon(Icons.Default.Email, null, modifier = Modifier.size(18.dp)) },
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Spacer(Modifier.height(16.dp))
+
+                    Button(
+                        onClick = {
+                            if (simEmail.isNotBlank() && simName.isNotBlank() && simEmail.contains("@")) {
+                                val userPseudo = if (simPseudo.isNotBlank()) simPseudo.trim() else simEmail.substringBefore("@")
+                                val customPic = "https://api.dicebear.com/7.x/pixel-art/png?seed=${userPseudo}"
+                                coroutineScope.launch {
+                                    viewModel.loginWithGoogle(
+                                        email = simEmail.trim(),
+                                        fullName = simName.trim(),
+                                        pseudo = userPseudo,
+                                        profilePic = customPic
+                                    )
+                                    onDismiss()
+                                }
+                            }
+                        },
+                        enabled = simEmail.contains("@") && simName.isNotBlank(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(44.dp),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
                         Text(
-                            text = if (languageCode == "FR") "Annuler" else "Cancel",
+                            text = if (languageCode == "FR") "Valider et créer mon profil" else "Submit and Create Profile",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    Spacer(Modifier.height(12.dp))
+
+                    TextButton(onClick = { isSimulating = false }) {
+                        Text(
+                            text = if (languageCode == "FR") "Retour aux diagnostics" else "Back to errors",
                             fontSize = 11.sp,
-                            color = colors.outline
+                            fontWeight = FontWeight.SemiBold,
+                            color = colors.primary
+                        )
+                    }
+                } else {
+                    // Google Auth Error diagnostics display
+                    Icon(
+                        imageVector = Icons.Default.Warning,
+                        contentDescription = "Warning",
+                        tint = colors.error,
+                        modifier = Modifier.size(36.dp)
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        text = if (languageCode == "FR") "Authentification Non Terminée" else "Authentication Unfinished",
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 16.sp,
+                        color = colors.error,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(colors.errorContainer.copy(alpha = 0.25f), RoundedCornerShape(12.dp))
+                            .padding(14.dp)
+                    ) {
+                        Text(
+                            text = errorMessage ?: "Erreur de connexion Google",
+                            fontSize = 11.sp,
+                            lineHeight = 15.sp,
+                            color = colors.onErrorContainer,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+
+                    Spacer(Modifier.height(16.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = onDismiss,
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text(if (languageCode == "FR") "Fermer" else "Close", fontSize = 11.sp)
+                        }
+
+                        Button(
+                            onClick = { startGoogleFlow() },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text(if (languageCode == "FR") "Réessayer" else "Retry", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+
+                    // Elegant, clean, professional fallback bypass (simulation bypass) for testing
+                    Spacer(Modifier.height(16.dp))
+                    HorizontalDivider(color = colors.outline.copy(alpha = 0.1f))
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        text = if (languageCode == "FR") {
+                            "Vous testez sur un simulateur ou sans services Google configurés ?"
+                        } else {
+                            "Are you testing on an emulator or without Google services ?"
+                        },
+                        fontSize = 10.sp,
+                        color = colors.onSurfaceVariant,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    TextButton(
+                        onClick = { isSimulating = true }
+                    ) {
+                        Text(
+                            text = if (languageCode == "FR") {
+                                "⚙️ Simuler avec mes identifiants de test"
+                            } else {
+                                "⚙️ Simulate with my test credentials"
+                            },
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.sp,
+                            color = colors.primary
                         )
                     }
                 }

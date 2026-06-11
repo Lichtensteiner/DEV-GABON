@@ -49,6 +49,13 @@ import com.example.R
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainAppScreen(viewModel: DevGabonViewModel) {
+    val isStartupLoading by viewModel.isStartupLoading.collectAsState()
+
+    if (isStartupLoading) {
+        StartupSplashScreen(viewModel = viewModel)
+        return
+    }
+
     val isLoggedIn by viewModel.isLoggedIn.collectAsState()
 
     if (!isLoggedIn) {
@@ -2387,6 +2394,17 @@ fun ProfileScreen(viewModel: DevGabonViewModel, isTablet: Boolean) {
                                 }
                             }
                             Text("@${currentProfile.pseudo} • ${currentProfile.city}, Gabon", fontSize = 12.sp, color = colors.onSurfaceVariant)
+                            Spacer(Modifier.height(2.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.Email,
+                                    contentDescription = "Email",
+                                    tint = colors.primary,
+                                    modifier = Modifier.size(12.dp)
+                                )
+                                Spacer(Modifier.width(4.dp))
+                                Text(currentProfile.email, fontSize = 11.sp, color = colors.primary, fontWeight = FontWeight.SemiBold)
+                            }
                         }
                     }
                 }

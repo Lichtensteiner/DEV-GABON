@@ -429,7 +429,7 @@ class DevGabonRepository(
         // 1. Seed profiles representing tech leaders in Gabon
         val seedProfiles = listOf(
             UserProfileEntity(
-                email = "ludo.consulting3@gmail.com",
+                email = "martinien.mve@devgabon.ga",
                 fullName = "Martinien Ludovic Mve Zogo",
                 pseudo = "MartiDev",
                 bio = "Consultant IT, Architecte Logiciel Senior et promoteur de Ludo_Consulting. Passionné par les technologies mobiles, Cloud et l'enseignement du code au Gabon.",
