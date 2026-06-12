@@ -42,35 +42,7 @@ class DevGabonViewModel(private val repository: DevGabonRepository) : ViewModel(
     private val _startupStatusText = MutableStateFlow("Initialisation...")
     val startupStatusText: StateFlow<String> = _startupStatusText.asStateFlow()
 
-    private val _isOnlineSimulationEnabled = MutableStateFlow(true)
-    val isOnlineSimulationEnabled: StateFlow<Boolean> = _isOnlineSimulationEnabled.asStateFlow()
 
-    fun toggleOnlineSimulation() {
-        _isOnlineSimulationEnabled.value = !_isOnlineSimulationEnabled.value
-    }
-
-    fun triggerRandomConnectionEvent() {
-        viewModelScope.launch {
-            val list = repository.profiles.first()
-            if (list.isNotEmpty()) {
-                val otherProfiles = list.filter { it.email != _activeUserEmail.value }
-                if (otherProfiles.isNotEmpty()) {
-                    val target = otherProfiles.random()
-                    val nextOnline = !target.isOnline
-                    repository.createProfile(target.copy(isOnline = nextOnline))
-                    
-                    val actionLabel = if (nextOnline) "s'est connecté" else "s'est déconnecté"
-                    repository.createNotification(NotificationEntity(
-                        type = "SYSTEM",
-                        senderName = target.fullName,
-                        message = "$actionLabel (Événement forcé par l'admin).",
-                        timestamp = System.currentTimeMillis(),
-                        isRead = false
-                    ))
-                }
-            }
-        }
-    }
 
     init {
         // Run a simulated loading of database entities and profiles, incrementing progress beautifully
@@ -95,40 +67,7 @@ class DevGabonViewModel(private val repository: DevGabonRepository) : ViewModel(
             }
             _isStartupLoading.value = false
             
-            // Periodically seed online/offline states to simulate realtime Gabon developer ecosystem traffic
-            viewModelScope.launch {
-                while (true) {
-                    kotlinx.coroutines.delay(6500) // update every 6.5s
-                    if (_isOnlineSimulationEnabled.value) {
-                        try {
-                            val list = repository.profiles.first()
-                            if (list.isNotEmpty()) {
-                                val otherProfiles = list.filter { it.email != _activeUserEmail.value }
-                                if (otherProfiles.isNotEmpty()) {
-                                    val target = otherProfiles.random()
-                                    val nextState = !target.isOnline
-                                    repository.createProfile(target.copy(isOnline = nextState))
-                                    
-                                    val messageText = if (nextState) {
-                                        "vient de se connecter à la plateforme pour administrer ses rôles."
-                                    } else {
-                                        "s'est déconnecté du réseau communautaire de talents."
-                                    }
-                                    repository.createNotification(NotificationEntity(
-                                        type = "SYSTEM",
-                                        senderName = target.fullName,
-                                        message = messageText,
-                                        timestamp = System.currentTimeMillis(),
-                                        isRead = false
-                                    ))
-                                }
-                            }
-                        } catch (e: Exception) {
-                            Log.e("OnlineSimulation", "Error during realtime traffic cycle", e)
-                        }
-                    }
-                }
-            }
+
         }
     }
 
@@ -271,8 +210,15 @@ class DevGabonViewModel(private val repository: DevGabonRepository) : ViewModel(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     // --- Follow System reactive cache ---
-    private val _followingEmails = MutableStateFlow<Set<String>>(emptySet())
-    val followingEmails: StateFlow<Set<String>> = _followingEmails.asStateFlow()
+    val followingEmails: StateFlow<Set<String>> = activeUserProfile
+        .flatMapLatest { profile ->
+            if (profile != null) {
+                repository.getFollows(profile.email).map { list -> list.map { it.followedEmail }.toSet() }
+            } else {
+                flowOf(emptySet())
+            }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptySet())
 
     // --- Centralized Dynamic Campus Flow Streams (Firestore Synced) ---
     private val _allSchools = MutableStateFlow<List<AcademicSchool>>(emptyList())
@@ -294,19 +240,6 @@ class DevGabonViewModel(private val repository: DevGabonRepository) : ViewModel(
     val allCohortPosts: StateFlow<List<Pair<String, String>>> = _allCohortPosts.asStateFlow()
 
     init {
-        // Collect following lists reactively when active user profile changes
-        viewModelScope.launch {
-            activeUserProfile.collect { profile ->
-                if (profile != null) {
-                    repository.getFollows(profile.email).collect { followsList ->
-                        _followingEmails.value = followsList.map { it.followedEmail }.toSet()
-                    }
-                } else {
-                    _followingEmails.value = emptySet()
-                }
-            }
-        }
-        
         // Setup real-time dynamic campus syncing
         setupCampusFirestoreSync()
     }
@@ -842,7 +775,7 @@ class DevGabonViewModel(private val repository: DevGabonRepository) : ViewModel(
         if (followerEmail == targetEmail) return // Can't follow oneself!
 
         viewModelScope.launch {
-            val isFollowingCurrent = _followingEmails.value.contains(targetEmail)
+            val isFollowingCurrent = followingEmails.value.contains(targetEmail)
             val profileList = repository.profiles.first()
             val targetProfile = profileList.find { it.email == targetEmail } ?: return@launch
             

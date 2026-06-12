@@ -1935,6 +1935,7 @@ fun MessagesScreen(viewModel: DevGabonViewModel, isTablet: Boolean) {
     val chatMessages by viewModel.activeChatMessages.collectAsState()
     val aiMessages by viewModel.aiMessages.collectAsState()
     val isAiLoading by viewModel.isAiLoading.collectAsState()
+    val activeUserProfile by viewModel.activeUserProfile.collectAsState()
     
     val colors = MaterialTheme.colorScheme
     
@@ -2037,6 +2038,7 @@ fun MessagesScreen(viewModel: DevGabonViewModel, isTablet: Boolean) {
                         recipientPic = activeChatRecipient!!.profilePicture,
                         messagesList = chatMessages,
                         isAiLoading = false,
+                        currentUserProfile = activeUserProfile,
                         onSendMessage = { text -> viewModel.sendDirectMessage(text) }
                     )
                 } else if (chatTypeSelection == "AI") {
@@ -2045,6 +2047,7 @@ fun MessagesScreen(viewModel: DevGabonViewModel, isTablet: Boolean) {
                         recipientPic = "🤖",
                         messagesList = aiMessages,
                         isAiLoading = isAiLoading,
+                        currentUserProfile = activeUserProfile,
                         onSendMessage = { text -> viewModel.sendAiMessage(text) }
                     )
                 } else {
@@ -2072,6 +2075,7 @@ fun MessagesScreen(viewModel: DevGabonViewModel, isTablet: Boolean) {
                     recipientPic = activeChatRecipient!!.profilePicture,
                     messagesList = chatMessages,
                     isAiLoading = false,
+                    currentUserProfile = activeUserProfile,
                     onBackClick = { activeChatByPhone = null },
                     onSendMessage = { text -> viewModel.sendDirectMessage(text) }
                 )
@@ -2083,6 +2087,7 @@ fun MessagesScreen(viewModel: DevGabonViewModel, isTablet: Boolean) {
                     recipientPic = "🤖",
                     messagesList = aiMessages,
                     isAiLoading = isAiLoading,
+                    currentUserProfile = activeUserProfile,
                     onBackClick = { activeChatByPhone = null },
                     onSendMessage = { text -> viewModel.sendAiMessage(text) }
                 )
@@ -2167,6 +2172,7 @@ fun ChatWindow(
     recipientPic: String,
     messagesList: List<MessageEntity>,
     isAiLoading: Boolean,
+    currentUserProfile: UserProfileEntity?,
     onBackClick: (() -> Unit)? = null,
     onSendMessage: (String) -> Unit
 ) {
@@ -2209,48 +2215,115 @@ fun ChatWindow(
             contentPadding = PaddingValues(vertical = 12.dp)
         ) {
             items(messagesList) { msg ->
-                val isMe = msg.senderPseudo == "Me" || msg.senderPseudo == "User" || msg.senderPseudo == "MartiDev"
+                val myPseudo = currentUserProfile?.pseudo ?: "Me"
+                val isMe = msg.senderPseudo == myPseudo || msg.senderPseudo == "Me" || msg.senderPseudo == "User" || msg.senderPseudo == "MartiDev"
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 4.dp),
-                    horizontalArrangement = if (isMe) Arrangement.End else Arrangement.Start
+                        .padding(vertical = 6.dp),
+                    horizontalArrangement = if (isMe) Arrangement.End else Arrangement.Start,
+                    verticalAlignment = Alignment.Bottom
                 ) {
-                    Card(
-                        shape = RoundedCornerShape(
-                            topStart = 16.dp,
-                            topEnd = 16.dp,
-                            bottomStart = if (isMe) 16.dp else 2.dp,
-                            bottomEnd = if (isMe) 2.dp else 16.dp
-                        ),
-                        colors = CardDefaults.cardColors(
-                            containerColor = if (isMe) colors.primary else colors.surfaceVariant
-                        ),
-                        modifier = Modifier.widthIn(max = 280.dp)
+                    // Left side avatar for other sender
+                    if (!isMe) {
+                        Surface(
+                            shape = CircleShape,
+                            color = colors.primary.copy(alpha = 0.1f),
+                            modifier = Modifier
+                                .size(32.dp)
+                                .align(Alignment.Bottom)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Text(recipientPic, fontSize = 16.sp)
+                            }
+                        }
+                        Spacer(Modifier.width(8.dp))
+                    }
+
+                    // Content bubble + timestamp
+                    Column(
+                        horizontalAlignment = if (isMe) Alignment.End else Alignment.Start,
+                        modifier = Modifier.weight(1f, fill = false)
                     ) {
-                        Column(modifier = Modifier.padding(12.dp)) {
+                        if (!isMe) {
                             Text(
-                                msg.messageText, 
-                                fontSize = 13.sp, 
-                                color = if (isMe) colors.onPrimary else colors.onBackground
+                                text = "@" + msg.senderPseudo,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = colors.onSurfaceVariant.copy(alpha = 0.7f),
+                                modifier = Modifier.padding(start = 4.dp, bottom = 2.dp)
                             )
-                            
-                            // Render simulated attached file if present
-                            if (msg.fileName != null) {
-                                Spacer(Modifier.height(6.dp))
-                                Card(
-                                    colors = CardDefaults.cardColors(containerColor = colors.background.copy(alpha = 0.3f)),
-                                    modifier = Modifier.fillMaxWidth().clickable { }
-                                ) {
-                                    Row(modifier = Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(Icons.Default.Add, "File", tint = if (isMe) colors.onPrimary else colors.primary, modifier = Modifier.size(16.dp))
-                                        Spacer(Modifier.width(6.dp))
-                                        Column {
-                                            Text(msg.fileName!!, fontSize = 10.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                            Text(msg.fileSize ?: "", fontSize = 8.sp)
+                        }
+
+                        Card(
+                            shape = RoundedCornerShape(
+                                topStart = 16.dp,
+                                topEnd = 16.dp,
+                                bottomStart = if (isMe) 16.dp else 2.dp,
+                                bottomEnd = if (isMe) 2.dp else 16.dp
+                            ),
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (isMe) colors.primary else colors.surfaceVariant
+                            ),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                            modifier = Modifier.widthIn(max = 280.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Text(
+                                    msg.messageText, 
+                                    fontSize = 13.sp, 
+                                    color = if (isMe) colors.onPrimary else colors.onSurfaceVariant
+                                )
+                                
+                                // Render simulated attached file if present
+                                if (msg.fileName != null) {
+                                    Spacer(Modifier.height(6.dp))
+                                    Card(
+                                        colors = CardDefaults.cardColors(
+                                            containerColor = if (isMe) colors.onPrimary.copy(alpha = 0.15f) else colors.background.copy(alpha = 0.5f)
+                                        ),
+                                        modifier = Modifier.fillMaxWidth().clickable { }
+                                    ) {
+                                        Row(modifier = Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(
+                                                Icons.Default.Add, 
+                                                "File", 
+                                                tint = if (isMe) colors.onPrimary else colors.primary, 
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                            Spacer(Modifier.width(6.dp))
+                                            Column {
+                                                Text(msg.fileName!!, fontSize = 10.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, color = if (isMe) colors.onPrimary else colors.onSurface)
+                                                Text(msg.fileSize ?: "", fontSize = 8.sp, color = if (isMe) colors.onPrimary.copy(alpha = 0.7f) else colors.onSurfaceVariant)
+                                            }
                                         }
                                     }
                                 }
+                            }
+                        }
+
+                        // Time
+                        val timeStr = java.text.SimpleDateFormat("HH:mm", java.util.Locale.FRANCE).format(java.util.Date(msg.timestamp))
+                        Text(
+                            text = timeStr,
+                            fontSize = 8.sp,
+                            color = colors.onSurfaceVariant.copy(alpha = 0.5f),
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                        )
+                    }
+
+                    // Right side avatar for me
+                    if (isMe) {
+                        Spacer(Modifier.width(8.dp))
+                        Surface(
+                            shape = CircleShape,
+                            color = colors.primary.copy(alpha = 0.15f),
+                            modifier = Modifier
+                                .size(32.dp)
+                                .align(Alignment.Bottom)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Text(currentUserProfile?.profilePicture ?: "😎", fontSize = 16.sp)
                             }
                         }
                     }
@@ -2352,7 +2425,6 @@ fun ProfileScreen(viewModel: DevGabonViewModel, isTablet: Boolean) {
     val profiles by viewModel.allProfiles.collectAsState()
     val languageCode by viewModel.languageCode.collectAsState()
     val followingEmails by viewModel.followingEmails.collectAsState()
-    val simulationEnabled by viewModel.isOnlineSimulationEnabled.collectAsState()
     val colors = MaterialTheme.colorScheme
 
     var isEditing by remember { mutableStateOf(false) }
@@ -2540,7 +2612,6 @@ fun ProfileScreen(viewModel: DevGabonViewModel, isTablet: Boolean) {
                                             profiles = profiles,
                                             currentProfile = currentProfile,
                                             followingEmails = followingEmails,
-                                            simulationEnabled = simulationEnabled,
                                             languageCode = languageCode,
                                             colors = colors,
                                             onViewCv = { clickedProf -> selectedProfileForCv = clickedProf }
@@ -2683,7 +2754,6 @@ fun ProfileScreen(viewModel: DevGabonViewModel, isTablet: Boolean) {
                                 profiles = profiles,
                                 currentProfile = currentProfile,
                                 followingEmails = followingEmails,
-                                simulationEnabled = simulationEnabled,
                                 languageCode = languageCode,
                                 colors = colors,
                                 onViewCv = { clickedProf -> selectedProfileForCv = clickedProf }
@@ -3017,7 +3087,6 @@ fun LiveMembersLayout(
     profiles: List<UserProfileEntity>,
     currentProfile: UserProfileEntity,
     followingEmails: Set<String>,
-    simulationEnabled: Boolean,
     languageCode: String,
     colors: ColorScheme,
     onViewCv: (UserProfileEntity) -> Unit
@@ -3025,93 +3094,45 @@ fun LiveMembersLayout(
     Column(
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        // Real-time Traffic Simulator controls card
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
-            colors = CardDefaults.cardColors(containerColor = colors.tertiaryContainer.copy(alpha = 0.35f)),
-            border = BorderStroke(1.dp, colors.tertiary.copy(alpha = 0.15f))
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(modifier = Modifier.padding(12.dp)) {
+            Text(
+                text = if (languageCode == "FR") "Rechercher des membres (Temps réel)" else "Live Search Community Members",
+                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.titleSmall,
+                color = colors.primary
+            )
+
+            Surface(
+                color = colors.primary.copy(alpha = 0.08f),
+                shape = RoundedCornerShape(8.dp),
+                border = BorderStroke(1.dp, colors.primary.copy(alpha = 0.12f))
+            ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(8.dp)
-                                .background(
-                                    color = if (simulationEnabled) Color(0xFF10B981) else Color.Gray,
-                                    shape = CircleShape
-                                )
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        Text(
-                            text = if (simulationEnabled) "Trafic en direct : ACTIF 🟢" else "Trafic en direct : PAUSE 🔘",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = colors.onTertiaryContainer
-                        )
-                    }
-                    
-                    Switch(
-                        checked = simulationEnabled,
-                        onCheckedChange = { viewModel.toggleOnlineSimulation() }
+                    Box(
+                        modifier = Modifier
+                            .size(7.dp)
+                            .background(Color(0xFF10B981), CircleShape)
                     )
-                }
-                
-                Text(
-                    text = if (languageCode == "FR") 
-                        "Le simulateur connecte et déconnecte des profils gabonais de façon aléatoire toutes les 6.5 secondes pour simuler le trafic de l'application." 
-                        else "Simulates real-time application traffic by toggling user online status in database every 6.5s.",
-                    fontSize = 10.sp,
-                    color = colors.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 4.dp, bottom = 8.dp)
-                )
-                
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Button(
-                        onClick = { viewModel.triggerRandomConnectionEvent() },
-                        colors = ButtonDefaults.buttonColors(containerColor = colors.tertiary),
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.height(28.dp)
-                    ) {
-                        Icon(Icons.Default.Bolt, "Force", modifier = Modifier.size(12.dp))
-                        Spacer(Modifier.width(4.dp))
-                        Text("Déclencher une connexion", fontSize = 9.sp)
-                    }
-                    
-                    Surface(
-                        color = colors.onTertiaryContainer.copy(alpha = 0.12f),
-                        shape = RoundedCornerShape(4.dp)
-                    ) {
-                        Text(
-                            text = "En ligne: ${profiles.count { it.isOnline }} / ${profiles.size}",
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
-                            color = colors.tertiary
-                        )
-                    }
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = if (languageCode == "FR") 
+                            "En ligne : ${profiles.count { it.isOnline }} / ${profiles.size}" 
+                            else "Online: ${profiles.count { it.isOnline }} / ${profiles.size}",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = colors.primary
+                    )
                 }
             }
         }
 
-        Spacer(Modifier.height(4.dp))
-
-        Text(
-            text = if (languageCode == "FR") "Rechercher des membres (Temps réel)" else "Live Search Community Members",
-            fontWeight = FontWeight.Bold,
-            style = MaterialTheme.typography.titleSmall,
-            color = colors.primary
-        )
-        
         var liveMemberQuery by remember { mutableStateOf("") }
         OutlinedTextField(
             value = liveMemberQuery,

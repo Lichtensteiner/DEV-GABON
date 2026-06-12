@@ -239,6 +239,64 @@ class DevGabonRepository(
                 }
             }
         }
+
+        // 7. Sync Follows in Realtime
+        firestore.collection("follows").addSnapshotListener { snapshots, e ->
+            if (e != null) {
+                Log.w("FirebaseSync", "Follows listen failed.", e)
+                return@addSnapshotListener
+            }
+            if (snapshots != null) {
+                for (doc in snapshots.documentChanges) {
+                    try {
+                        val d = doc.document.data
+                        val followerEmail = d["followerEmail"] as? String ?: continue
+                        val followedEmail = d["followedEmail"] as? String ?: continue
+                        val timestamp = d["timestamp"] as? Long ?: System.currentTimeMillis()
+                        val follow = FollowEntity(followerEmail, followedEmail, timestamp)
+                        if (doc.type == com.google.firebase.firestore.DocumentChange.Type.REMOVED) {
+                            scope.launch { dao.deleteFollow(followerEmail, followedEmail) }
+                        } else {
+                            scope.launch { dao.insertFollow(follow) }
+                        }
+                    } catch (ex: Throwable) {
+                        Log.e("FirebaseSync", "Error parsing follow document", ex)
+                    }
+                }
+            }
+        }
+
+        // 8. Sync Notifications in Realtime
+        firestore.collection("notifications").addSnapshotListener { snapshots, e ->
+            if (e != null) {
+                Log.w("FirebaseSync", "Notifications listen failed.", e)
+                return@addSnapshotListener
+            }
+            if (snapshots != null) {
+                for (doc in snapshots.documentChanges) {
+                    try {
+                        val d = doc.document.data
+                        val id = (d["id"] as? Long)?.toInt() ?: 0
+                        if (id == 0) continue
+                        val notification = NotificationEntity(
+                            id = id,
+                            type = d["type"] as? String ?: "SYSTEM",
+                            senderName = d["senderName"] as? String ?: "",
+                            message = d["message"] as? String ?: "",
+                            timestamp = d["timestamp"] as? Long ?: System.currentTimeMillis(),
+                            isRead = d["isRead"] as? Boolean ?: false
+                        )
+                        if (doc.type == com.google.firebase.firestore.DocumentChange.Type.REMOVED) {
+                            // nothing path
+                        } else {
+                            scope.launch { dao.insertNotification(notification) }
+                        }
+                    } catch (ex: Throwable) {
+                        Log.e("FirebaseSync", "Error parsing notification document", ex)
+                    }
+                }
+            }
+        }
     }
 
     // Streams
