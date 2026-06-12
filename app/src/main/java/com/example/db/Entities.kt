@@ -25,7 +25,8 @@ data class UserProfileEntity(
     val articleCount: Int = 0,
     val subscriberCount: Int = 0,
     val isVerified: Boolean = false,
-    val role: String = "Développeur"
+    val role: String = "Développeur",
+    val isOnline: Boolean = false
 )
 
 @Entity(tableName = "posts")
@@ -150,4 +151,11 @@ data class NotificationEntity(
     val message: String,
     val timestamp: Long = System.currentTimeMillis(),
     val isRead: Boolean = false
+)
+
+@Entity(tableName = "follows", primaryKeys = ["followerEmail", "followedEmail"])
+data class FollowEntity(
+    val followerEmail: String,
+    val followedEmail: String,
+    val timestamp: Long = System.currentTimeMillis()
 )

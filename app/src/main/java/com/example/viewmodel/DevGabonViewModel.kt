@@ -42,6 +42,36 @@ class DevGabonViewModel(private val repository: DevGabonRepository) : ViewModel(
     private val _startupStatusText = MutableStateFlow("Initialisation...")
     val startupStatusText: StateFlow<String> = _startupStatusText.asStateFlow()
 
+    private val _isOnlineSimulationEnabled = MutableStateFlow(true)
+    val isOnlineSimulationEnabled: StateFlow<Boolean> = _isOnlineSimulationEnabled.asStateFlow()
+
+    fun toggleOnlineSimulation() {
+        _isOnlineSimulationEnabled.value = !_isOnlineSimulationEnabled.value
+    }
+
+    fun triggerRandomConnectionEvent() {
+        viewModelScope.launch {
+            val list = repository.profiles.first()
+            if (list.isNotEmpty()) {
+                val otherProfiles = list.filter { it.email != _activeUserEmail.value }
+                if (otherProfiles.isNotEmpty()) {
+                    val target = otherProfiles.random()
+                    val nextOnline = !target.isOnline
+                    repository.createProfile(target.copy(isOnline = nextOnline))
+                    
+                    val actionLabel = if (nextOnline) "s'est connecté" else "s'est déconnecté"
+                    repository.createNotification(NotificationEntity(
+                        type = "SYSTEM",
+                        senderName = target.fullName,
+                        message = "$actionLabel (Événement forcé par l'admin).",
+                        timestamp = System.currentTimeMillis(),
+                        isRead = false
+                    ))
+                }
+            }
+        }
+    }
+
     init {
         // Run a simulated loading of database entities and profiles, incrementing progress beautifully
         viewModelScope.launch {
@@ -64,6 +94,41 @@ class DevGabonViewModel(private val repository: DevGabonRepository) : ViewModel(
                 }
             }
             _isStartupLoading.value = false
+            
+            // Periodically seed online/offline states to simulate realtime Gabon developer ecosystem traffic
+            viewModelScope.launch {
+                while (true) {
+                    kotlinx.coroutines.delay(6500) // update every 6.5s
+                    if (_isOnlineSimulationEnabled.value) {
+                        try {
+                            val list = repository.profiles.first()
+                            if (list.isNotEmpty()) {
+                                val otherProfiles = list.filter { it.email != _activeUserEmail.value }
+                                if (otherProfiles.isNotEmpty()) {
+                                    val target = otherProfiles.random()
+                                    val nextState = !target.isOnline
+                                    repository.createProfile(target.copy(isOnline = nextState))
+                                    
+                                    val messageText = if (nextState) {
+                                        "vient de se connecter à la plateforme pour administrer ses rôles."
+                                    } else {
+                                        "s'est déconnecté du réseau communautaire de talents."
+                                    }
+                                    repository.createNotification(NotificationEntity(
+                                        type = "SYSTEM",
+                                        senderName = target.fullName,
+                                        message = messageText,
+                                        timestamp = System.currentTimeMillis(),
+                                        isRead = false
+                                    ))
+                                }
+                            }
+                        } catch (e: Exception) {
+                            Log.e("OnlineSimulation", "Error during realtime traffic cycle", e)
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -105,7 +170,8 @@ class DevGabonViewModel(private val repository: DevGabonRepository) : ViewModel(
                     linkedinUrl = "",
                     portfolioUrl = "",
                     isVerified = (email == "ludo.consulting3@gmail.com"),
-                    role = role
+                    role = role,
+                    isOnline = true
                 )
                 repository.createProfile(newProfile)
             } else {
@@ -113,7 +179,8 @@ class DevGabonViewModel(private val repository: DevGabonRepository) : ViewModel(
                 repository.createProfile(existing.copy(
                     fullName = fullName,
                     profilePicture = profilePic,
-                    pseudo = if (existing.pseudo.isBlank() || existing.pseudo == "MartiDev" || existing.pseudo == "ludodev") pseudo else existing.pseudo
+                    pseudo = if (existing.pseudo.isBlank() || existing.pseudo == "MartiDev" || existing.pseudo == "ludodev") pseudo else existing.pseudo,
+                    isOnline = true
                 ))
             }
             _isLoggedIn.value = true
@@ -122,9 +189,17 @@ class DevGabonViewModel(private val repository: DevGabonRepository) : ViewModel(
     }
 
     fun logout() {
+        val email = _activeUserEmail.value
         _isLoggedIn.value = false
         _activeUserEmail.value = ""
         _currentScreen.value = Screen.Feed
+        viewModelScope.launch {
+            if (email.isNotBlank()) {
+                repository.getProfile(email).first()?.let { prof ->
+                    repository.createProfile(prof.copy(isOnline = false))
+                }
+            }
+        }
     }
 
     fun updateActiveUserRole(role: String) {
@@ -195,6 +270,47 @@ class DevGabonViewModel(private val repository: DevGabonRepository) : ViewModel(
     val allProfiles: StateFlow<List<UserProfileEntity>> = repository.profiles
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    // --- Follow System reactive cache ---
+    private val _followingEmails = MutableStateFlow<Set<String>>(emptySet())
+    val followingEmails: StateFlow<Set<String>> = _followingEmails.asStateFlow()
+
+    // --- Centralized Dynamic Campus Flow Streams (Firestore Synced) ---
+    private val _allSchools = MutableStateFlow<List<AcademicSchool>>(emptyList())
+    val allSchools: StateFlow<List<AcademicSchool>> = _allSchools.asStateFlow()
+
+    private val _allLibraryItems = MutableStateFlow<List<AcademicLibraryItem>>(emptyList())
+    val allLibraryItems: StateFlow<List<AcademicLibraryItem>> = _allLibraryItems.asStateFlow()
+
+    private val _allTeachers = MutableStateFlow<List<AcademicTeacher>>(emptyList())
+    val allTeachers: StateFlow<List<AcademicTeacher>> = _allTeachers.asStateFlow()
+
+    private val _allAcademicInternships = MutableStateFlow<List<AcademicInternship>>(emptyList())
+    val allAcademicInternships: StateFlow<List<AcademicInternship>> = _allAcademicInternships.asStateFlow()
+
+    private val _allAcademicClubs = MutableStateFlow<List<AcademicClub>>(emptyList())
+    val allAcademicClubs: StateFlow<List<AcademicClub>> = _allAcademicClubs.asStateFlow()
+
+    private val _allCohortPosts = MutableStateFlow<List<Pair<String, String>>>(emptyList())
+    val allCohortPosts: StateFlow<List<Pair<String, String>>> = _allCohortPosts.asStateFlow()
+
+    init {
+        // Collect following lists reactively when active user profile changes
+        viewModelScope.launch {
+            activeUserProfile.collect { profile ->
+                if (profile != null) {
+                    repository.getFollows(profile.email).collect { followsList ->
+                        _followingEmails.value = followsList.map { it.followedEmail }.toSet()
+                    }
+                } else {
+                    _followingEmails.value = emptySet()
+                }
+            }
+        }
+        
+        // Setup real-time dynamic campus syncing
+        setupCampusFirestoreSync()
+    }
+
     val allPosts: StateFlow<List<PostEntity>> = repository.posts
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -224,16 +340,15 @@ class DevGabonViewModel(private val repository: DevGabonRepository) : ViewModel(
     val activeChatRecipient: StateFlow<UserProfileEntity?> = _activeChatRecipient.asStateFlow()
 
     val activeChatMessages: StateFlow<List<MessageEntity>> = combine(
-        _activeUserEmail,
+        activeUserProfile,
         _activeChatRecipient
-    ) { email, recipient ->
-        if (recipient == null) {
-            emptyList()
+    ) { activeProfile, recipient ->
+        Pair(activeProfile, recipient)
+    }.flatMapLatest { (activeProfile, recipient) ->
+        if (activeProfile == null || recipient == null) {
+            flowOf(emptyList())
         } else {
-            // Find current user's profile to get their pseudo
-            val activeProfile = activeUserProfile.value
-            val userPseudo = activeProfile?.pseudo ?: "Me"
-            repository.getMessagesForChat(userPseudo, recipient.pseudo).first()
+            repository.getMessagesForChat(activeProfile.pseudo, recipient.pseudo)
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -553,8 +668,8 @@ class DevGabonViewModel(private val repository: DevGabonRepository) : ViewModel(
                 )
             )
 
-            // Trigger simulated immediate reply for highly interactive feeling
-            simulateReply(recipient)
+            // Do NOT simulate automatic bot replies to maintain authentic, real-time developer peer conversations.
+            // simulateReply(recipient)
         }
     }
 
@@ -623,6 +738,13 @@ class DevGabonViewModel(private val repository: DevGabonRepository) : ViewModel(
 
     fun switchActiveProfile(email: String) {
         _activeUserEmail.value = email
+        viewModelScope.launch {
+            if (email.isNotBlank()) {
+                repository.getProfile(email).first()?.let { prof ->
+                    repository.createProfile(prof.copy(isOnline = true))
+                }
+            }
+        }
     }
 
     // --- Gemini API Call ---
@@ -710,6 +832,390 @@ class DevGabonViewModel(private val repository: DevGabonRepository) : ViewModel(
             }
         } catch (e: Exception) {
             "Hmm, impossible de joindre l'IA de DEV GABON (${e.message}). Vérifie ta connexion internet ou réessaie dans un instant."
+        }
+    }
+
+    // --- Follow / S'abonner & Notifications sync logic ---
+    fun toggleFollow(targetEmail: String) {
+        val activeProfile = activeUserProfile.value ?: return
+        val followerEmail = activeProfile.email
+        if (followerEmail == targetEmail) return // Can't follow oneself!
+
+        viewModelScope.launch {
+            val isFollowingCurrent = _followingEmails.value.contains(targetEmail)
+            val profileList = repository.profiles.first()
+            val targetProfile = profileList.find { it.email == targetEmail } ?: return@launch
+            
+            if (isFollowingCurrent) {
+                // Unfollow
+                repository.unfollowUser(followerEmail, targetEmail)
+                
+                // Decrement target subscriber count
+                val updatedCount = maxOf(0, targetProfile.subscriberCount - 1)
+                val updatedTarget = targetProfile.copy(subscriberCount = updatedCount)
+                repository.createProfile(updatedTarget)
+                
+                // Send automated system notification as requested for deep multi-device interactivity
+                repository.createNotification(
+                    NotificationEntity(
+                        type = "MESSAGE",
+                        senderName = activeProfile.fullName,
+                        message = "${activeProfile.fullName} s'est désabonné de votre profil."
+                    )
+                )
+            } else {
+                // Follow
+                repository.followUser(followerEmail, targetEmail)
+                
+                // Increment target subscriber count
+                val updatedCount = targetProfile.subscriberCount + 1
+                val updatedTarget = targetProfile.copy(subscriberCount = updatedCount)
+                repository.createProfile(updatedTarget)
+                
+                // Send system notification
+                repository.createNotification(
+                    NotificationEntity(
+                        type = "MESSAGE",
+                        senderName = activeProfile.fullName,
+                        message = "${activeProfile.fullName} s'est abonné à votre profil ! 🇬🇦❤️"
+                    )
+                )
+            }
+        }
+    }
+
+    // --- Dynamic Campus Firestore Synchronizers ---
+    private fun setupCampusFirestoreSync() {
+        val firestore = try {
+            com.google.firebase.firestore.FirebaseFirestore.getInstance()
+        } catch (e: Throwable) {
+            null
+        }
+        if (firestore == null) {
+            loadLocalCampusDefaults()
+            return
+        }
+
+        // 1. Schools Listener
+        try {
+            firestore.collection("campus_schools").addSnapshotListener { snapshots, e ->
+                if (e != null || snapshots == null) {
+                    loadLocalCampusDefaults()
+                    return@addSnapshotListener
+                }
+                if (snapshots.isEmpty) {
+                    seedDefaultSchools(firestore)
+                } else {
+                    val list = snapshots.documents.mapNotNull { doc ->
+                        try {
+                            AcademicSchool(
+                                id = (doc.getLong("id") ?: 0L).toInt(),
+                                name = doc.getString("name") ?: "",
+                                logoEmoji = doc.getString("logoEmoji") ?: "🏫",
+                                type = doc.getString("type") ?: "Université",
+                                description = doc.getString("description") ?: "",
+                                address = doc.getString("address") ?: "",
+                                website = doc.getString("website") ?: "",
+                                tel = doc.getString("tel") ?: "",
+                                email = doc.getString("email") ?: "",
+                                isVerified = doc.getBoolean("isVerified") ?: false,
+                                filieres = (doc.get("filieres") as? List<*>)?.mapNotNull { it?.toString() } ?: emptyList(),
+                                studentCount = (doc.getLong("studentCount") ?: 0L).toInt(),
+                                announcements = (doc.get("announcements") as? List<*>)?.mapNotNull { it?.toString() } ?: emptyList()
+                            )
+                        } catch (ex: Throwable) { null }
+                    }.sortedBy { it.id }
+                    _allSchools.value = list
+                }
+            }
+        } catch (ex: Throwable) {
+            loadLocalCampusDefaults()
+        }
+
+        // 2. Library Items Listener
+        try {
+            firestore.collection("campus_library").addSnapshotListener { snapshots, e ->
+                if (e != null || snapshots == null) return@addSnapshotListener
+                if (snapshots.isEmpty) {
+                    seedDefaultLibrary(firestore)
+                } else {
+                    val list = snapshots.documents.mapNotNull { doc ->
+                        try {
+                            AcademicLibraryItem(
+                                id = (doc.getLong("id") ?: 0L).toInt(),
+                                title = doc.getString("title") ?: "",
+                                category = doc.getString("category") ?: "Cours",
+                                description = doc.getString("description") ?: "",
+                                author = doc.getString("author") ?: "",
+                                school = doc.getString("school") ?: "",
+                                url = doc.getString("url") ?: "https://devgabon.net/library/",
+                                timestamp = doc.getLong("timestamp") ?: System.currentTimeMillis()
+                            )
+                        } catch (ex: Throwable) { null }
+                    }.sortedBy { it.id }
+                    _allLibraryItems.value = list
+                }
+            }
+        } catch (ex: Throwable) {}
+
+        // 3. Teachers Listener
+        try {
+            firestore.collection("campus_teachers").addSnapshotListener { snapshots, e ->
+                if (e != null || snapshots == null) return@addSnapshotListener
+                if (snapshots.isEmpty) {
+                    seedDefaultTeachers(firestore)
+                } else {
+                    val list = snapshots.documents.mapNotNull { doc ->
+                        try {
+                            AcademicTeacher(
+                                id = (doc.getLong("id") ?: 0L).toInt(),
+                                name = doc.getString("name") ?: "",
+                                emoji = doc.getString("emoji") ?: "👴",
+                                email = doc.getString("email") ?: "",
+                                specialties = doc.getString("specialties") ?: "",
+                                coursesCount = (doc.getLong("coursesCount") ?: 0L).toInt(),
+                                activeGradings = (doc.getLong("activeGradings") ?: 0L).toInt()
+                            )
+                        } catch (ex: Throwable) { null }
+                    }.sortedBy { it.id }
+                    _allTeachers.value = list
+                }
+            }
+        } catch (ex: Throwable) {}
+
+        // 4. Internships Listener
+        try {
+            firestore.collection("campus_internships").addSnapshotListener { snapshots, e ->
+                if (e != null || snapshots == null) return@addSnapshotListener
+                if (snapshots.isEmpty) {
+                    seedDefaultInternships(firestore)
+                } else {
+                    val list = snapshots.documents.mapNotNull { doc ->
+                        try {
+                            AcademicInternship(
+                                id = (doc.getLong("id") ?: 0L).toInt(),
+                                title = doc.getString("title") ?: "",
+                                company = doc.getString("company") ?: "",
+                                logoEmoji = doc.getString("logoEmoji") ?: "🏢",
+                                description = doc.getString("description") ?: "",
+                                postedBySchool = doc.getString("postedBySchool") ?: "",
+                                status = doc.getString("status") ?: "Disponible",
+                                studentAssigned = doc.getString("studentAssigned")
+                            )
+                        } catch (ex: Throwable) { null }
+                    }.sortedBy { it.id }
+                    _allAcademicInternships.value = list
+                }
+            }
+        } catch (ex: Throwable) {}
+
+        // 5. Clubs Listener
+        try {
+            firestore.collection("campus_clubs").addSnapshotListener { snapshots, e ->
+                if (e != null || snapshots == null) return@addSnapshotListener
+                if (snapshots.isEmpty) {
+                    seedDefaultClubs(firestore)
+                } else {
+                    val list = snapshots.documents.mapNotNull { doc ->
+                        try {
+                            AcademicClub(
+                                id = (doc.getLong("id") ?: 0L).toInt(),
+                                name = doc.getString("name") ?: "",
+                                emoji = doc.getString("emoji") ?: "📱",
+                                category = doc.getString("category") ?: "",
+                                description = doc.getString("description") ?: "",
+                                leaderName = doc.getString("leaderName") ?: "",
+                                membersCount = (doc.getLong("membersCount") ?: 1L).toInt(),
+                                nextEvent = doc.getString("nextEvent") ?: ""
+                            )
+                        } catch (ex: Throwable) { null }
+                    }.sortedBy { it.id }
+                    _allAcademicClubs.value = list
+                }
+            }
+        } catch (ex: Throwable) {}
+
+        // 6. Cohort Posts (Promos posts)
+        try {
+            firestore.collection("campus_cohort_posts").addSnapshotListener { snapshots, e ->
+                if (e != null || snapshots == null) return@addSnapshotListener
+                if (snapshots.isEmpty) {
+                    seedDefaultCohortPosts(firestore)
+                } else {
+                    val list = snapshots.documents.mapNotNull { doc ->
+                        try {
+                            val sender = doc.getString("sender") ?: ""
+                            val content = doc.getString("content") ?: ""
+                            val order = doc.getLong("order") ?: 0L
+                            Pair(order, Pair(sender, content))
+                        } catch (ex: Throwable) { null }
+                    }.sortedBy { it.first }.map { it.second }
+                    _allCohortPosts.value = list
+                }
+            }
+        } catch (ex: Throwable) {}
+    }
+
+    private fun seedDefaultSchools(db: com.google.firebase.firestore.FirebaseFirestore) {
+        val list = listOf(
+            AcademicSchool(1, "Université de Libreville (UL)", "🏫", "Université", "La plus grande institution académique publique du pays, formant l'élite de l'ingénierie centrale.", "Boulevard Triompthal, Libreville, Gabon", "www.univ-libreville.ga", "+241 077-445-123", "contact@univ-libreville.ga", true, listOf("Génie Logiciel", "Réseaux et Télécommunications", "Cybersécurité", "Intelligence Artificielle"), 2450, listOf("Session de Hackathon Communautaire - Inscriptions Ouvertes !", "Ouverture du nouveau pôle de Recherche en Intelligence Artificielle.")),
+            AcademicSchool(2, "École Nationale d'Informatique (ENI)", "💻", "École", "École d'excellence professionnelle reconnue pour la rigueur de ses filières de programmation.", "Ancienne Sobraga, Libreville, Gabon", "www.eni.ga", "+241 062-889-110", "admin@eni.ga", true, listOf("Génie Logiciel", "Systèmes & Réseaux IT", "Développement Mobile"), 550, listOf("Soutenance de mémoires de la promotion 2026 fixée au 15 Septembre.")),
+            AcademicSchool(3, "Institut Supérieur de Technologie (IST)", "🚀", "Centre de Formation", "Établissement supérieur axé sur l'innovation industrielle et l'alternance en entreprise.", "Zone Industrielle d'Oloumi, Libreville", "www.ist.ga", "+241 074-129-906", "registrar@ist.ga", true, listOf("Maintenance Réseaux", "IoT & Électronique", "Administration Cloud"), 820)
+        )
+        list.forEach { db.collection("campus_schools").document(it.id.toString()).set(it) }
+    }
+
+    private fun seedDefaultLibrary(db: com.google.firebase.firestore.FirebaseFirestore) {
+        val list = listOf(
+            AcademicLibraryItem(1, "Support complet : Introduction au langage Kotlin", "Cours", "Syntaxe moderne, variables nullables, programmation fonctionnelle et coroutines appliquées.", "M. Mve Zogo Ludovic Martinien", "Université de Libreville"),
+            AcademicLibraryItem(2, "Analyse comparative des protocoles de routage sans-fil dans les zones denses gabonaises", "Mémoire", "Étude de cas des performances réseaux lors des pics d'accès internet à Libreville.", "Jean-Claude Biyogo", "École Nationale d'Informatique"),
+            AcademicLibraryItem(3, "Application Android de suivi nutritionnel pour l'Hôpital Militaire de Libreville", "Projet de fin d'étude", "Prototype fonctionnel développé en Jetpack Compose permettant le suivi en temps réel des patients.", "Laurine Massala (Promotion GL 2026)", "Université de Libreville"),
+            AcademicLibraryItem(4, "Manuel de Cybersécurité : durcissement des serveurs locaux", "Livre numérique", "Pratiques de sécurisation pour les infrastructures et les datacenters d'Afrique centrale.", "Didier Obiang", "Institut Supérieur de Technologie")
+        )
+        list.forEach { db.collection("campus_library").document(it.id.toString()).set(it) }
+    }
+
+    private fun seedDefaultTeachers(db: com.google.firebase.firestore.FirebaseFirestore) {
+        val list = listOf(
+            AcademicTeacher(1, "Pr. Jean-Paul Mbenga", "👴", "jp.mbenga@univ-libreville.ga", "Algorithmique complexe, IA", 8, 3),
+            AcademicTeacher(2, "Dr. Sandrine Bignoumba", "👩‍🏫", "s.bignoumba@eni.ga", "Bases de données SQL / NoSQL", 12, 1),
+            AcademicTeacher(3, "M. Pierre-Alain Ondo", "👨‍🏫", "pa.ondo@ist.ga", "Systèmes distribués & Kubernetes", 5, 4)
+        )
+        list.forEach { db.collection("campus_teachers").document(it.id.toString()).set(it) }
+    }
+
+    private fun seedDefaultInternships(db: com.google.firebase.firestore.FirebaseFirestore) {
+        val list = listOf(
+            AcademicInternship(1, "Assistant Développeur Mobile Android", "Gabon Telecom", "🏢", "Développement d'outils internes d'assistance client.", "Université de Libreville", "Disponible"),
+            AcademicInternship(2, "Stagiaire Cloud & DevOps", "ANINF Gabon", "📡", "Intégration d'outils d'automatisation CI/CD sur Kubernetes.", "École Nationale d'Informatique", "En cours", "MartiDev"),
+            AcademicInternship(3, "Développeur Full-Stack Junior / Stage", "Caisse de Dépôts et Consignations", "🏦", "Conception d'une application d'historisation bancaire.", "Institut Supérieur de Technologie", "Disponible")
+        )
+        list.forEach { db.collection("campus_internships").document(it.id.toString()).set(it) }
+    }
+
+    private fun seedDefaultClubs(db: com.google.firebase.firestore.FirebaseFirestore) {
+        val list = listOf(
+            AcademicClub(1, "Club Robotique d'Oloumi", "🤖", "Robotique", "Conception matérielle d'automates basés sur Raspberry et Arduino.", "Arnaud Nguema", 28, "Atelier d'interfaçage IOT - Vendredi 16h"),
+            AcademicClub(2, "Club IA Gabon AI", "🧠", "Intelligence Artificielle", "Exploration de modèles génératifs et de reconnaissance visuelle locale.", "Hassan Meye", 42, "Meetup d'introduction aux LLMs - Samedi 10h"),
+            AcademicClub(3, "Club Cybersécurité GL 2026", "🛡️", "Cybersécurité", "Entraînement CTF national et analyse de menaces réseau au Gabon.", "Audrey Beka", 19, "Entraînement CTF inter-écoles - Dimanche 14h"),
+            AcademicClub(4, "Club Dev Mobile Libreville", "📱", "Développement Mobile", "Prototypage rapide d'applications mobiles utiles aux citoyens gabonais.", "Rudy Bounga", 35, "Sprint SwiftUI & Compose - Mercredi 18h")
+        )
+        list.forEach { db.collection("campus_clubs").document(it.id.toString()).set(it) }
+    }
+
+    private fun seedDefaultCohortPosts(db: com.google.firebase.firestore.FirebaseFirestore) {
+        val list = listOf(
+            Pair("Ludo Mve", "Salut l'équipe ! Le dépôt GitHub de notre projet de fin d'études est configuré. Ajoutez vos pseudos ! 💻🔥"),
+            Pair("AudreyUX", "J'ai partagé les maquettes Figma dans notre espace partagé. Des avis sur la charte Gabonaise ? 🇬🇦"),
+            Pair("MartiDev", "Excellent ! Je m'occupe de la squelette de l'application Jetpack Compose ce soir.")
+        )
+        list.forEachIndexed { idx, item ->
+            val m = hashMapOf(
+                "sender" to item.first,
+                "content" to item.second,
+                "order" to idx.toLong()
+            )
+            db.collection("campus_cohort_posts").document(idx.toString()).set(m)
+        }
+    }
+
+    private fun loadLocalCampusDefaults() {
+        _allSchools.value = listOf(
+            AcademicSchool(1, "Université de Libreville (UL)", "🏫", "Université", "La plus grande institution académique publique du pays, formant l'élite de l'ingénierie centrale.", "Boulevard Triompthal, Libreville, Gabon", "www.univ-libreville.ga", "+241 077-445-123", "contact@univ-libreville.ga", true, listOf("Génie Logiciel", "Réseaux et Télécommunications", "Cybersécurité", "Intelligence Artificielle"), 2450, listOf("Session de Hackathon Communautaire - Inscriptions Ouvertes !", "Ouverture du nouveau pôle de Recherche en Intelligence Artificielle.")),
+            AcademicSchool(2, "École Nationale d'Informatique (ENI)", "💻", "École", "École d'excellence professionnelle reconnue pour la rigueur de ses filières de programmation.", "Ancienne Sobraga, Libreville, Gabon", "www.eni.ga", "+241 062-889-110", "admin@eni.ga", true, listOf("Génie Logiciel", "Systèmes & Réseaux IT", "Développement Mobile"), 550, listOf("Soutenance de mémoires de la promotion 2026 fixée au 15 Septembre.")),
+            AcademicSchool(3, "Institut Supérieur de Technologie (IST)", "🚀", "Centre de Formation", "Établissement supérieur axé sur l'innovation industrielle et l'alternance en entreprise.", "Zone Industrielle d'Oloumi, Libreville", "www.ist.ga", "+241 074-129-906", "registrar@ist.ga", true, listOf("Maintenance Réseaux", "IoT & Électronique", "Administration Cloud"), 820)
+        )
+        _allLibraryItems.value = listOf(
+            AcademicLibraryItem(1, "Support complet : Introduction au langage Kotlin", "Cours", "Syntaxe moderne, variables nullables, programmation fonctionnelle et coroutines appliquées.", "M. Mve Zogo Ludovic Martinien", "Université de Libreville"),
+            AcademicLibraryItem(2, "Analyse comparative des protocoles de routage sans-fil dans les zones denses gabonaises", "Mémoire", "Étude de cas des performances réseaux lors des pics d'accès internet à Libreville.", "Jean-Claude Biyogo", "École Nationale d'Informatique")
+        )
+        _allTeachers.value = listOf(
+            AcademicTeacher(1, "Pr. Jean-Paul Mbenga", "👴", "jp.mbenga@univ-libreville.ga", "Algorithmique complexe, IA", 8, 3),
+            AcademicTeacher(2, "Dr. Sandrine Bignoumba", "👩‍🏫", "s.bignoumba@eni.ga", "Bases de données SQL / NoSQL", 12, 1)
+        )
+        _allAcademicInternships.value = listOf(
+            AcademicInternship(1, "Assistant Développeur Mobile Android", "Gabon Telecom", "🏢", "Développement d'outils internes d'assistance client.", "Université de Libreville", "Disponible"),
+            AcademicInternship(2, "Stagiaire Cloud & DevOps", "ANINF Gabon", "📡", "Intégration d'outils d'automatisation CI/CD sur Kubernetes.", "École Nationale d'Informatique", "En cours", "MartiDev")
+        )
+        _allAcademicClubs.value = listOf(
+            AcademicClub(1, "Club Robotique d'Oloumi", "🤖", "Robotique", "Conception matérielle d'automates basés sur Raspberry et Arduino.", "Arnaud Nguema", 28, "Atelier d'interfaçage IOT - Vendredi 16h"),
+            AcademicClub(2, "Club IA Gabon AI", "🧠", "Intelligence Artificielle", "Exploration de modèles génératifs et de reconnaissance visuelle locale.", "Hassan Meye", 42, "Meetup d'introduction aux LLMs - Samedi 10h")
+        )
+        _allCohortPosts.value = listOf(
+            Pair("Ludo Mve", "Salut l'équipe ! Le dépôt GitHub de notre projet de fin d'études est configuré. Ajoutez vos pseudos ! 💻🔥")
+        )
+    }
+
+    // --- Dynamic Campus Resource Writers ---
+    fun writeSchool(school: AcademicSchool) {
+        viewModelScope.launch {
+            try {
+                com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                    .collection("campus_schools").document(school.id.toString()).set(school)
+            } catch (ex: Throwable) {
+                _allSchools.value = _allSchools.value + school
+            }
+        }
+    }
+
+    fun writeLibraryItem(item: AcademicLibraryItem) {
+        viewModelScope.launch {
+            try {
+                com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                    .collection("campus_library").document(item.id.toString()).set(item)
+            } catch (ex: Throwable) {
+                _allLibraryItems.value = _allLibraryItems.value + item
+            }
+        }
+    }
+
+    fun writeTeacher(teacher: AcademicTeacher) {
+        viewModelScope.launch {
+            try {
+                com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                    .collection("campus_teachers").document(teacher.id.toString()).set(teacher)
+            } catch (ex: Throwable) {
+                _allTeachers.value = _allTeachers.value + teacher
+            }
+        }
+    }
+
+    fun writeAcademicInternship(internship: AcademicInternship) {
+        viewModelScope.launch {
+            try {
+                com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                    .collection("campus_internships").document(internship.id.toString()).set(internship)
+            } catch (ex: Throwable) {
+                _allAcademicInternships.value = _allAcademicInternships.value + internship
+            }
+        }
+    }
+
+    fun writeAcademicClub(club: AcademicClub) {
+        viewModelScope.launch {
+            try {
+                com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                    .collection("campus_clubs").document(club.id.toString()).set(club)
+            } catch (ex: Throwable) {
+                _allAcademicClubs.value = _allAcademicClubs.value + club
+            }
+        }
+    }
+
+    fun writeCohortPost(sender: String, content: String) {
+        viewModelScope.launch {
+            val order = _allCohortPosts.value.size.toLong() + 1
+            val m = hashMapOf(
+                "sender" to sender,
+                "content" to content,
+                "order" to order
+            )
+            try {
+                com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                    .collection("campus_cohort_posts").document(order.toString()).set(m)
+            } catch (ex: Throwable) {
+                _allCohortPosts.value = _allCohortPosts.value + Pair(sender, content)
+            }
         }
     }
 

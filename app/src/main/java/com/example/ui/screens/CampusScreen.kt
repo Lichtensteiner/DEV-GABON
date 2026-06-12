@@ -30,65 +30,7 @@ import com.example.db.*
 import com.example.viewmodel.DevGabonViewModel
 import kotlinx.coroutines.launch
 
-// Seed data structures for dynamic academic interaction in the Campus ecosystem
-data class AcademicSchool(
-    val id: Int,
-    val name: String,
-    val logoEmoji: String,
-    val type: String, // "Université", "École", "Centre de Formation"
-    val description: String,
-    val address: String,
-    val website: String,
-    val tel: String,
-    val email: String,
-    val isVerified: Boolean,
-    val filieres: List<String>,
-    val studentCount: Int,
-    val announcements: List<String> = emptyList()
-)
-
-data class AcademicLibraryItem(
-    val id: Int,
-    val title: String,
-    val category: String, // "Cours", "Mémoire", "Projet de fin d'étude", "Livre numérique", "Tutoriel"
-    val description: String,
-    val author: String,
-    val school: String,
-    val url: String = "https://devgabon.net/library/",
-    val timestamp: Long = System.currentTimeMillis()
-)
-
-data class AcademicTeacher(
-    val id: Int,
-    val name: String,
-    val emoji: String,
-    val email: String,
-    val specialties: String,
-    val coursesCount: Int,
-    val activeGradings: Int
-)
-
-data class AcademicInternship(
-    val id: Int,
-    val title: String,
-    val company: String,
-    val logoEmoji: String,
-    val description: String,
-    val postedBySchool: String,
-    val status: String = "Disponible", // "Disponible", "En cours", "Rapport validé"
-    val studentAssigned: String? = null
-)
-
-data class AcademicClub(
-    val id: Int,
-    val name: String,
-    val emoji: String,
-    val category: String,
-    val description: String,
-    val leaderName: String,
-    val membersCount: Int,
-    val nextEvent: String
-)
+// Seed data structures are now imported globally from com.example.db.* to enable synchronized mutability across screens.
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -102,140 +44,12 @@ fun CampusScreen(viewModel: DevGabonViewModel) {
     val customRole = activeProfile?.role ?: "Développeur"
 
     // Seeding dynamic state lists for interactive use
-    var schoolsList by remember {
-        mutableStateOf(
-            listOf(
-                AcademicSchool(
-                    id = 1,
-                    name = "Université de Libreville (UL)",
-                    logoEmoji = "🏫",
-                    type = "Université",
-                    description = "La plus grande institution académique publique du pays, formant l'élite de l'ingénierie centrale.",
-                    address = "Boulevard Triompthal, Libreville, Gabon",
-                    website = "www.univ-libreville.ga",
-                    tel = "+241 077-445-123",
-                    email = "contact@univ-libreville.ga",
-                    isVerified = true,
-                    filieres = listOf("Génie Logiciel", "Réseaux et Télécommunications", "Cybersécurité", "Intelligence Artificielle"),
-                    studentCount = 2450,
-                    announcements = listOf(
-                        "Session de Hackathon Communautaire - Inscriptions Ouvertes !",
-                        "Ouverture du nouveau pôle de Recherche en Intelligence Artificielle."
-                    )
-                ),
-                AcademicSchool(
-                    id = 2,
-                    name = "École Nationale d'Informatique (ENI)",
-                    logoEmoji = "💻",
-                    type = "École",
-                    description = "École d'excellence professionnelle reconnue pour la rigueur de ses filières de programmation.",
-                    address = "Ancienne Sobraga, Libreville, Gabon",
-                    website = "www.eni.ga",
-                    tel = "+241 062-889-110",
-                    email = "admin@eni.ga",
-                    isVerified = true,
-                    filieres = listOf("Génie Logiciel", "Systèmes & Réseaux IT", "Développement Mobile"),
-                    studentCount = 550,
-                    announcements = listOf("Soutenance de mémoires de la promotion 2026 fixée au 15 Septembre.")
-                ),
-                AcademicSchool(
-                    id = 3,
-                    name = "Institut Supérieur de Technologie (IST)",
-                    logoEmoji = "🚀",
-                    type = "Centre de Formation",
-                    description = "Établissement supérieur axé sur l'innovation industrielle et l'alternance en entreprise.",
-                    address = "Zone Industrielle d'Oloumi, Libreville",
-                    website = "www.ist.ga",
-                    tel = "+241 074-129-906",
-                    email = "registrar@ist.ga",
-                    isVerified = true,
-                    filieres = listOf("Maintenance Réseaux", "IoT & Électronique", "Administration Cloud"),
-                    studentCount = 820
-                )
-            )
-        )
-    }
-
-    var libraryList by remember {
-        mutableStateOf(
-            listOf(
-                AcademicLibraryItem(
-                    id = 1,
-                    title = "Support complet : Introduction au langage Kotlin",
-                    category = "Cours",
-                    description = "Syntaxe moderne, variables nullables, programmation fonctionnelle et coroutines appliquées.",
-                    author = "M. Mve Zogo Ludovic Martinien",
-                    school = "Université de Libreville"
-                ),
-                AcademicLibraryItem(
-                    id = 2,
-                    title = "Analyse comparative des protocoles de routage sans-fil dans les zones denses gabonaises",
-                    category = "Mémoire",
-                    description = "Étude de cas des performances réseaux lors des pics d'accès internet à Libreville.",
-                    author = "Jean-Claude Biyogo",
-                    school = "École Nationale d'Informatique"
-                ),
-                AcademicLibraryItem(
-                    id = 3,
-                    title = "Application Android de suivi nutritionnel pour l'Hôpital Militaire de Libreville",
-                    category = "Projet de fin d'étude",
-                    description = "Prototype fonctionnel développé en Jetpack Compose permettant le suivi en temps réel des patients.",
-                    author = "Laurine Massala (Promotion GL 2026)",
-                    school = "Université de Libreville"
-                ),
-                AcademicLibraryItem(
-                    id = 4,
-                    title = "Manuel de Cybersécurité : durcissement des serveurs locaux",
-                    category = "Livre numérique",
-                    description = "Pratiques de sécurisation pour les infrastructures et les datacenters d'Afrique centrale.",
-                    author = "Didier Obiang",
-                    school = "Institut Supérieur de Technologie"
-                )
-            )
-        )
-    }
-
-    var teachersList by remember {
-        mutableStateOf(
-            listOf(
-                AcademicTeacher(1, "Pr. Jean-Paul Mbenga", "👴", "jp.mbenga@univ-libreville.ga", "Algorithmique complexe, IA", 8, 3),
-                AcademicTeacher(2, "Dr. Sandrine Bignoumba", "👩‍🏫", "s.bignoumba@eni.ga", "Bases de données SQL / NoSQL", 12, 1),
-                AcademicTeacher(3, "M. Pierre-Alain Ondo", "👨‍🏫", "pa.ondo@ist.ga", "Systèmes distribués & Kubernetes", 5, 4)
-            )
-        )
-    }
-
-    var internshipsList by remember {
-        mutableStateOf(
-            listOf(
-                AcademicInternship(1, "Assistant Développeur Mobile Android", "Gabon Telecom", "🏢", "Développement d'outils internes d'assistance client.", "Université de Libreville", "Disponible"),
-                AcademicInternship(2, "Stagiaire Cloud & DevOps", "ANINF Gabon", "📡", "Intégration d'outils d'automatisation CI/CD sur Kubernetes.", "École Nationale d'Informatique", "En cours", "MartiDev"),
-                AcademicInternship(3, "Développeur Full-Stack Junior / Stage", "Caisse de Dépôts et Consignations", "🏦", "Conception d'une application d'historisation bancaire.", "Institut Supérieur de Technologie", "Disponible")
-            )
-        )
-    }
-
-    var clubsList by remember {
-        mutableStateOf(
-            listOf(
-                AcademicClub(1, "Club Robotique d'Oloumi", "🤖", "Robotique", "Conception matérielle d'automates basés sur Raspberry et Arduino.", "Arnaud Nguema", 28, "Atelier d'interfaçage IOT - Vendredi 16h"),
-                AcademicClub(2, "Club IA Gabon AI", "🧠", "Intelligence Artificielle", "Exploration de modèles génératifs et de reconnaissance visuelle locale.", "Hassan Meye", 42, "Meetup d'introduction aux LLMs - Samedi 10h"),
-                AcademicClub(3, "Club Cybersécurité GL 2026", "🛡️", "Cybersécurité", "Entraînement CTF national et analyse de menaces réseau au Gabon.", "Audrey Beka", 19, "Entraînement CTF inter-écoles - Dimanche 14h"),
-                AcademicClub(4, "Club Dev Mobile Libreville", "📱", "Développement Mobile", "Prototypage rapide d'applications mobiles utiles aux citoyens gabonais.", "Rudy Bounga", 35, "Sprint SwiftUI & Compose - Mercredi 18h")
-            )
-        )
-    }
-
-    // Dynamic promotion/cohort messages (Promotion Génie Logiciel 2026)
-    var cohortPosts by remember {
-        mutableStateOf(
-            listOf(
-                Pair("Ludo Mve", "Salut l'équipe ! Le dépôt GitHub de notre projet de fin d'études est configuré. Ajoutez vos pseudos ! 💻🔥"),
-                Pair("AudreyUX", "J'ai partagé les maquettes Figma dans notre espace partagé. Des avis sur la charte Gabonaise ? 🇬🇦"),
-                Pair("MartiDev", "Excellent ! Je m'occupe de la squelette de l'application Jetpack Compose ce soir.")
-            )
-        )
-    }
+    val schoolsList by viewModel.allSchools.collectAsState()
+    val libraryList by viewModel.allLibraryItems.collectAsState()
+    val teachersList by viewModel.allTeachers.collectAsState()
+    val internshipsList by viewModel.allAcademicInternships.collectAsState()
+    val clubsList by viewModel.allAcademicClubs.collectAsState()
+    val cohortPosts by viewModel.allCohortPosts.collectAsState()
 
     // State managers
     var activeTab by remember { mutableStateOf(0) }
@@ -429,10 +243,10 @@ fun CampusScreen(viewModel: DevGabonViewModel) {
                         colors = colors,
                         onAddInternship = { showAddInternshipDialog = true },
                         onRegisterLocalReport = { id, student ->
-                            internshipsList = internshipsList.map {
-                                if (it.id == id) {
-                                    it.copy(status = "Rapport validé", studentAssigned = student)
-                                } else it
+                            internshipsList.find { it.id == id }?.let { internship ->
+                                viewModel.writeAcademicInternship(
+                                    internship.copy(status = "Rapport validé", studentAssigned = student)
+                                )
                             }
                         }
                     )
@@ -550,7 +364,7 @@ fun CampusScreen(viewModel: DevGabonViewModel) {
                                         filieres = listOf("Tronc Commun Informatique"),
                                         studentCount = 10
                                     )
-                                    schoolsList = schoolsList + newSchool
+                                    viewModel.writeSchool(newSchool)
                                 }
                                 showAddSchoolDialog = false
                             },
@@ -598,12 +412,12 @@ fun CampusScreen(viewModel: DevGabonViewModel) {
                         Spacer(Modifier.width(8.dp))
                         Button(
                             onClick = {
-                                if (filiereName.isNotBlank()) {
-                                    schoolsList = schoolsList.map { s ->
-                                        if (s.id == selectedSchoolForFiliere!!.id) {
-                                            s.copy(filieres = s.filieres + filiereName)
-                                        } else s
-                                    }
+                                if (filiereName.isNotBlank() && selectedSchoolForFiliere != null) {
+                                    viewModel.writeSchool(
+                                        selectedSchoolForFiliere!!.copy(
+                                            filieres = selectedSchoolForFiliere!!.filieres + filiereName
+                                        )
+                                    )
                                 }
                                 showAddFiliereDialog = false
                             }
@@ -707,7 +521,7 @@ fun CampusScreen(viewModel: DevGabonViewModel) {
                                         author = docAuthor,
                                         school = docSchool
                                     )
-                                    libraryList = libraryList + newItem
+                                    viewModel.writeLibraryItem(newItem)
                                 }
                                 showAddDocDialog = false
                             }
@@ -748,14 +562,16 @@ fun CampusScreen(viewModel: DevGabonViewModel) {
                         TextButton(onClick = { showAddCourseDialog = false }) { Text("Annuler") }
                         Button(onClick = {
                             if (teacherName.isNotBlank() && fieldSub.isNotBlank()) {
-                                teachersList = teachersList + AcademicTeacher(
-                                    id = teachersList.size + 1,
-                                    name = teacherName,
-                                    emoji = "👨‍🏫",
-                                    email = "${teacherName.lowercase().replace(" ", "")}@devgabon.ga",
-                                    specialties = fieldSub,
-                                    coursesCount = 1,
-                                    activeGradings = 1
+                                viewModel.writeTeacher(
+                                    AcademicTeacher(
+                                        id = teachersList.size + 1,
+                                        name = teacherName,
+                                        emoji = "👨‍🏫",
+                                        email = "${teacherName.lowercase().replace(" ", "")}@devgabon.ga",
+                                        specialties = fieldSub,
+                                        coursesCount = 1,
+                                        activeGradings = 1
+                                    )
                                 )
                             }
                             showAddCourseDialog = false
@@ -790,14 +606,16 @@ fun CampusScreen(viewModel: DevGabonViewModel) {
                         TextButton(onClick = { showAddInternshipDialog = false }) { Text("Annuler") }
                         Button(onClick = {
                             if (intTitle.isNotBlank()) {
-                                internshipsList = internshipsList + AcademicInternship(
-                                    id = internshipsList.size + 1,
-                                    title = intTitle,
-                                    company = intCompany,
-                                    logoEmoji = "💼",
-                                    description = intDesc,
-                                    postedBySchool = intSchool,
-                                    status = "Disponible"
+                                viewModel.writeAcademicInternship(
+                                    AcademicInternship(
+                                        id = internshipsList.size + 1,
+                                        title = intTitle,
+                                        company = intCompany,
+                                        logoEmoji = "💼",
+                                        description = intDesc,
+                                        postedBySchool = intSchool,
+                                        status = "Disponible"
+                                    )
                                 )
                             }
                             showAddInternshipDialog = false
@@ -822,7 +640,10 @@ fun CampusScreen(viewModel: DevGabonViewModel) {
                         TextButton(onClick = { showAddPromoPostDialog = false }) { Text("Fermer") }
                         Button(onClick = {
                             if (userText.isNotBlank()) {
-                                cohortPosts = cohortPosts + Pair(activeProfile?.fullName ?: "MartiDev", userText)
+                                viewModel.writeCohortPost(
+                                    sender = activeProfile?.fullName ?: "MartiDev",
+                                    content = userText
+                                )
                             }
                             showAddPromoPostDialog = false
                         }) { Text("Envoyer") }
@@ -848,7 +669,9 @@ fun CampusScreen(viewModel: DevGabonViewModel) {
                     Spacer(Modifier.height(16.dp))
                     Button(onClick = {
                         // Immediately verifies the very first school to showcase success dynamically
-                        schoolsList = schoolsList.map { s -> if (s.id == 1) s.copy(isVerified = true) else s }
+                        schoolsList.find { it.id == 1 }?.let { school ->
+                            viewModel.writeSchool(school.copy(isVerified = true))
+                        }
                         showVerificationDialog = false
                     }, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981))) {
                         Text("Envoyer les Certificats d'Agrément")

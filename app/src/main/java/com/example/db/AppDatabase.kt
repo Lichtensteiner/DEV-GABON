@@ -30,7 +30,7 @@ interface DevGabonDao {
     fun getPostsByGroup(groupName: String): Flow<List<PostEntity>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertPost(post: PostEntity)
+    suspend fun insertPost(post: PostEntity): Long
 
     @Query("UPDATE posts SET likesCount = :likesCount, userLiked = :userLiked WHERE id = :postId")
     suspend fun updatePostLikeState(postId: Int, likesCount: Int, userLiked: Boolean)
@@ -46,7 +46,7 @@ interface DevGabonDao {
     fun getCommentsForPost(postId: Int): Flow<List<CommentEntity>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertComment(comment: CommentEntity)
+    suspend fun insertComment(comment: CommentEntity): Long
 
     // --- Articles / Blog ---
     @Query("SELECT * FROM articles ORDER BY timestamp DESC")
@@ -56,7 +56,7 @@ interface DevGabonDao {
     fun getArticlesByCategory(category: String): Flow<List<ArticleEntity>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertArticle(article: ArticleEntity)
+    suspend fun insertArticle(article: ArticleEntity): Long
 
     @Query("UPDATE articles SET reactionsCount = :reactionsCount WHERE id = :articleId")
     suspend fun updateArticleReactions(articleId: Int, reactionsCount: Int)
@@ -69,7 +69,7 @@ interface DevGabonDao {
     fun getAllGroups(): Flow<List<GroupEntity>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertGroup(group: GroupEntity)
+    suspend fun insertGroup(group: GroupEntity): Long
 
     @Query("UPDATE groups SET isJoined = :isJoined, membersCount = membersCount + :memberChange WHERE id = :groupId")
     suspend fun updateGroupJoinState(groupId: Int, isJoined: Boolean, memberChange: Int)
@@ -79,7 +79,7 @@ interface DevGabonDao {
     fun getAllJobs(): Flow<List<JobEntity>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertJob(job: JobEntity)
+    suspend fun insertJob(job: JobEntity): Long
 
     @Query("UPDATE jobs SET isApplied = :isApplied WHERE id = :jobId")
     suspend fun updateJobAppliedState(jobId: Int, isApplied: Boolean)
@@ -89,7 +89,7 @@ interface DevGabonDao {
     fun getAllProjects(): Flow<List<ProjectEntity>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertProject(project: ProjectEntity)
+    suspend fun insertProject(project: ProjectEntity): Long
 
     @Query("UPDATE collaborative_projects SET isJoined = :isJoined, membersCount = membersCount + :memberChange WHERE id = :projectId")
     suspend fun updateProjectJoinState(projectId: Int, isJoined: Boolean, memberChange: Int)
@@ -99,7 +99,7 @@ interface DevGabonDao {
     fun getAllEvents(): Flow<List<EventEntity>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertEvent(event: EventEntity)
+    suspend fun insertEvent(event: EventEntity): Long
 
     @Query("UPDATE events SET isRegistered = :isRegistered, attendeesCount = attendeesCount + :attendeeChange WHERE id = :eventId")
     suspend fun updateEventRegisterState(eventId: Int, isRegistered: Boolean, attendeeChange: Int)
@@ -112,17 +112,33 @@ interface DevGabonDao {
     fun getAllMessages(): Flow<List<MessageEntity>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertMessage(message: MessageEntity)
+    suspend fun insertMessage(message: MessageEntity): Long
 
     // --- Notifications ---
     @Query("SELECT * FROM notifications ORDER BY timestamp DESC")
     fun getAllNotifications(): Flow<List<NotificationEntity>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertNotification(notification: NotificationEntity)
+    suspend fun insertNotification(notification: NotificationEntity): Long
 
     @Query("UPDATE notifications SET isRead = 1 WHERE id = :notificationId")
     suspend fun markNotificationAsRead(notificationId: Int)
+
+    // --- Follow System ---
+    @Query("SELECT * FROM follows WHERE followerEmail = :email")
+    fun getFollowsByFollower(email: String): Flow<List<FollowEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertFollow(follow: FollowEntity)
+
+    @Query("DELETE FROM follows WHERE followerEmail = :followerEmail AND followedEmail = :followedEmail")
+    suspend fun deleteFollow(followerEmail: String, followedEmail: String)
+
+    @Query("SELECT EXISTS(SELECT 1 FROM follows WHERE followerEmail = :followerEmail AND followedEmail = :followedEmail LIMIT 1)")
+    fun isFollowing(followerEmail: String, followedEmail: String): Flow<Boolean>
+
+    @Query("DELETE FROM follows")
+    suspend fun clearFollows()
 
     // --- User Management & Reset DB ---
     @Query("DELETE FROM user_profiles WHERE id = :id")
@@ -173,9 +189,10 @@ interface DevGabonDao {
         ProjectEntity::class,
         EventEntity::class,
         MessageEntity::class,
-        NotificationEntity::class
+        NotificationEntity::class,
+        FollowEntity::class
     ],
-    version = 3,
+    version = 5,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

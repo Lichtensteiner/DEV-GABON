@@ -8,6 +8,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -1988,7 +1989,17 @@ fun MessagesScreen(viewModel: DevGabonViewModel, isTablet: Boolean) {
                                 ProfileImage(picture = dev.profilePicture, size = 32.dp)
                                 Spacer(Modifier.width(12.dp))
                                 Column {
-                                    Text(dev.fullName, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(dev.fullName, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                        if (dev.isOnline) {
+                                            Spacer(Modifier.width(4.dp))
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(6.dp)
+                                                    .background(Color(0xFF4CAF50), shape = CircleShape)
+                                            )
+                                        }
+                                    }
                                     Text("@${dev.pseudo}", fontSize = 10.sp, color = colors.onSurfaceVariant)
                                 }
                             }
@@ -2125,7 +2136,19 @@ fun MessagesScreen(viewModel: DevGabonViewModel, isTablet: Boolean) {
                             ProfileImage(picture = dev.profilePicture, size = 36.dp)
                             Spacer(Modifier.width(12.dp))
                             Column(Modifier.weight(1f)) {
-                                Text(dev.fullName, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(dev.fullName, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                    if (dev.isOnline) {
+                                        Spacer(Modifier.width(4.dp))
+                                        Box(
+                                            modifier = Modifier
+                                                .size(6.dp)
+                                                .background(Color(0xFF4CAF50), shape = CircleShape)
+                                        )
+                                        Spacer(Modifier.width(4.dp))
+                                        Text("En ligne", color = Color(0xFF4CAF50), fontSize = 10.sp, fontWeight = FontWeight.Medium)
+                                    }
+                                }
                                 Text("@${dev.pseudo}", fontSize = 11.sp, color = colors.onSurfaceVariant)
                             }
                             Icon(Icons.Default.ArrowForward, "Chat", tint = colors.onSurfaceVariant.copy(alpha = 0.5f))
@@ -2328,9 +2351,15 @@ fun ProfileScreen(viewModel: DevGabonViewModel, isTablet: Boolean) {
     val activeProfile by viewModel.activeUserProfile.collectAsState()
     val profiles by viewModel.allProfiles.collectAsState()
     val languageCode by viewModel.languageCode.collectAsState()
+    val followingEmails by viewModel.followingEmails.collectAsState()
+    val simulationEnabled by viewModel.isOnlineSimulationEnabled.collectAsState()
     val colors = MaterialTheme.colorScheme
 
     var isEditing by remember { mutableStateOf(false) }
+    var currentProfileTab by remember { mutableStateOf(0) }
+    
+    // Detailed CV view dialog target for any clicked community user
+    var selectedProfileForCv by remember { mutableStateOf<UserProfileEntity?>(null) }
 
     if (activeProfile == null) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -2349,171 +2378,172 @@ fun ProfileScreen(viewModel: DevGabonViewModel, isTablet: Boolean) {
                 }
             )
         } else {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(androidx.compose.foundation.rememberScrollState())
-                    .padding(16.dp)
-            ) {
-                // Header with national color gradients background
-                Box(
+            if (isTablet) {
+                // Adaptive layout: Professional Tablet dual-pane view
+                Row(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .height(80.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(
-                            Brush.linearGradient(
-                                colors = listOf(Color(0xFF10B981), Color(0xFFF59E0B), Color(0xFF0EA5E9))
-                            )
-                        )
-                )
-
-                // Profile card content overlapping slightly
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp)
+                        .fillMaxSize()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    Row(
-                        modifier = Modifier.offset(y = (-24).dp),
-                        verticalAlignment = Alignment.Bottom
+                    // Left Column (1.2f weight) - Profile static overview & actions
+                    Card(
+                        modifier = Modifier
+                            .weight(1.2f)
+                            .fillMaxHeight()
+                            .verticalScroll(androidx.compose.foundation.rememberScrollState()),
+                        colors = CardDefaults.cardColors(containerColor = colors.surface),
+                        border = BorderStroke(1.dp, colors.outline.copy(alpha = 0.12f)),
+                        shape = RoundedCornerShape(16.dp)
                     ) {
-                        ProfileImage(
-                            picture = currentProfile.profilePicture,
-                            modifier = Modifier.border(3.dp, colors.background, CircleShape),
-                            size = 68.dp
-                        )
-                        
-                        Spacer(Modifier.width(12.dp))
-                        
-                        Column(modifier = Modifier.padding(bottom = 4.dp)) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            // National colours ribbon banner
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(70.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(
+                                        Brush.linearGradient(
+                                            colors = listOf(Color(0xFF10B981), Color(0xFFF59E0B), Color(0xFF0EA5E9))
+                                        )
+                                    )
+                            )
+                            
+                            Spacer(Modifier.height(12.dp))
+                            
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(currentProfile.fullName, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                                if (currentProfile.isVerified) {
-                                    Icon(Icons.Default.Verified, "Verified badge", tint = colors.tertiary, modifier = Modifier.size(16.dp).padding(start = 4.dp))
+                                ProfileImage(
+                                    picture = currentProfile.profilePicture,
+                                    modifier = Modifier.border(3.dp, colors.background, CircleShape),
+                                    size = 64.dp
+                                )
+                                Spacer(Modifier.width(12.dp))
+                                Column {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(currentProfile.fullName, fontWeight = FontWeight.Bold, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        if (currentProfile.isVerified) {
+                                            Icon(Icons.Default.Verified, "Verify", tint = colors.tertiary, modifier = Modifier.size(15.dp).padding(start = 2.dp))
+                                        }
+                                    }
+                                    Text("@${currentProfile.pseudo} • ${currentProfile.city}", fontSize = 11.sp, color = colors.onSurfaceVariant)
                                 }
                             }
-                            Text("@${currentProfile.pseudo} • ${currentProfile.city}, Gabon", fontSize = 12.sp, color = colors.onSurfaceVariant)
-                            Spacer(Modifier.height(2.dp))
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = Icons.Default.Email,
-                                    contentDescription = "Email",
-                                    tint = colors.primary,
-                                    modifier = Modifier.size(12.dp)
+                            
+                            Spacer(Modifier.height(16.dp))
+                            HorizontalDivider(color = colors.outline.copy(alpha = 0.08f))
+                            Spacer(Modifier.height(12.dp))
+                            
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 2.dp)) {
+                                Icon(Icons.Default.Email, "Email", tint = colors.primary, modifier = Modifier.size(14.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text(currentProfile.email, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                            }
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 2.dp)) {
+                                Icon(Icons.Default.Handyman, "Level", tint = colors.primary, modifier = Modifier.size(14.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text(currentProfile.experienceLevel, fontSize = 11.sp)
+                            }
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 2.dp)) {
+                                Icon(Icons.Default.DeveloperMode, "Role", tint = colors.primary, modifier = Modifier.size(14.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text(currentProfile.role, fontSize = 11.sp)
+                            }
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 2.dp)) {
+                                val onlineColor = if (currentProfile.isOnline) Color(0xFF10B981) else Color.Gray
+                                Box(modifier = Modifier.size(8.dp).background(onlineColor, CircleShape))
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    text = if (currentProfile.isOnline) "En ligne (Temps réel)" else "Hors Ligne",
+                                    fontSize = 11.sp,
+                                    color = onlineColor,
+                                    fontWeight = FontWeight.Bold
                                 )
-                                Spacer(Modifier.width(4.dp))
-                                Text(currentProfile.email, fontSize = 11.sp, color = colors.primary, fontWeight = FontWeight.SemiBold)
+                            }
+                            
+                            Spacer(Modifier.height(16.dp))
+                            
+                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                if (currentProfile.isPro) {
+                                    Surface(shape = RoundedCornerShape(6.dp), color = colors.primary.copy(alpha = 0.15f)) {
+                                        Text("⭐ PRO DEV", modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp), fontSize = 9.sp, fontWeight = FontWeight.Bold, color = colors.primary)
+                                    }
+                                }
+                                if (currentProfile.isRecruiter) {
+                                    Surface(shape = RoundedCornerShape(6.dp), color = colors.secondary.copy(alpha = 0.15f)) {
+                                        Text("🏢 RECRUTEUR RH", modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp), fontSize = 9.sp, fontWeight = FontWeight.Bold, color = colors.secondary)
+                                    }
+                                }
+                            }
+                            
+                            Spacer(Modifier.height(24.dp))
+                            
+                            Button(
+                                onClick = { isEditing = true },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                Icon(Icons.Default.Edit, "Modifier", modifier = Modifier.size(14.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text("Modifier mon CV", fontSize = 11.sp)
+                            }
+                            Spacer(Modifier.height(8.dp))
+                            OutlinedButton(
+                                onClick = { viewModel.logout() },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(10.dp),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = colors.error),
+                                border = BorderStroke(1.dp, colors.error.copy(alpha = 0.5f))
+                            ) {
+                                Icon(Icons.Default.ExitToApp, "Logout", modifier = Modifier.size(14.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text(if (languageCode == "FR") "Quitter" else "Sign Out", fontSize = 11.sp)
                             }
                         }
                     }
-                }
 
-                // Sub headers
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row {
-                        if (currentProfile.isPro) {
-                            Surface(shape = RoundedCornerShape(6.dp), color = colors.primary.copy(alpha = 0.15f), modifier = Modifier.padding(end = 4.dp)) {
-                                Text("⭐ PRO DEV", modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp), fontSize = 10.sp, fontWeight = FontWeight.Bold, color = colors.primary)
-                            }
-                        }
-                        if (currentProfile.isRecruiter) {
-                            Surface(shape = RoundedCornerShape(6.dp), color = colors.secondary.copy(alpha = 0.15f)) {
-                                Text("🏢 RECRUTEUR RH", modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp), fontSize = 10.sp, fontWeight = FontWeight.Bold, color = colors.secondary)
-                            }
-                        }
-                    }
-
-                    Row {
-                        Button(
-                            onClick = { isEditing = true },
-                            colors = ButtonDefaults.buttonColors(containerColor = colors.primary),
-                            modifier = Modifier.padding(end = 4.dp)
-                        ) {
-                            Icon(Icons.Default.Edit, "Modifier", modifier = Modifier.size(14.dp))
-                            Spacer(Modifier.width(6.dp))
-                            Text("Mon CV", fontSize = 11.sp)
-                        }
-
-                        OutlinedButton(
-                            onClick = { viewModel.logout() },
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = colors.error),
-                            border = BorderStroke(1.dp, colors.error.copy(alpha = 0.5f))
-                        ) {
-                            Icon(Icons.Default.ExitToApp, "Logout", modifier = Modifier.size(14.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text(if (languageCode == "FR") "Quitter" else "Sign Out", fontSize = 11.sp)
-                        }
-                    }
-                }
-
-                Spacer(Modifier.height(16.dp))
-
-                // Stats Dashboard Row
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(containerColor = colors.surfaceVariant.copy(alpha = 0.5f))
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(12.dp),
-                        horizontalArrangement = Arrangement.SpaceAround
+                    // Right Column (2.0f weight) - Content workspace with sub-tabs
+                    Column(
+                        modifier = Modifier.weight(2.0f)
                     ) {
-                        ProfileStatItem(num = currentProfile.postCount.toString(), label = "Posts")
-                        ProfileStatItem(num = currentProfile.articleCount.toString(), label = "Tutoriels")
-                        ProfileStatItem(num = currentProfile.subscriberCount.toString(), label = "Abonnés")
-                    }
-                }
-
-                Spacer(Modifier.height(16.dp))
-
-                // Profile details details
-                Text("Bio & Parcours", fontWeight = FontWeight.Black, color = colors.primary, style = MaterialTheme.typography.titleMedium)
-                Spacer(Modifier.height(6.dp))
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = colors.surface)
-                ) {
-                    Column(Modifier.padding(12.dp)) {
-                        Text(currentProfile.bio.ifBlank { "Pas encore de biographie. Présentez votre parcours informatique en modifiant votre profil !" }, fontSize = 13.sp, lineHeight = 18.sp)
-                        Spacer(Modifier.height(10.dp))
-                        Row {
-                            Text("Niveau de maîtrise : ", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = colors.onSurfaceVariant)
-                            Text(currentProfile.experienceLevel, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = colors.primary)
+                        TabRow(
+                            selectedTabIndex = currentProfileTab,
+                            containerColor = colors.background,
+                            contentColor = colors.primary,
+                            modifier = Modifier.padding(bottom = 12.dp)
+                        ) {
+                            Tab(
+                                selected = currentProfileTab == 0,
+                                onClick = { currentProfileTab = 0 },
+                                text = { Text(if (languageCode == "FR") "Mon CV Virtuel" else "My CV Resume", fontSize = 12.sp, fontWeight = FontWeight.Bold) },
+                                icon = { Icon(Icons.Default.ContactPage, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                            )
+                            Tab(
+                                selected = currentProfileTab == 1,
+                                onClick = { currentProfileTab = 1 },
+                                text = { Text(if (languageCode == "FR") "Membres en Direct (${profiles.count { it.isOnline }}/${profiles.size})" else "Live Members (${profiles.count { it.isOnline }}/${profiles.size})", fontSize = 12.sp, fontWeight = FontWeight.Bold) },
+                                icon = { Icon(Icons.Default.LeakAdd, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                            )
                         }
-                    }
-                }
 
-                Spacer(Modifier.height(16.dp))
-
-                // Skills tags wrap
-                Text("Compétences Clés (Tags)", fontWeight = FontWeight.Black, color = colors.primary, style = MaterialTheme.typography.titleMedium)
-                Spacer(Modifier.height(6.dp))
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = colors.surface)
-                ) {
-                    Column(Modifier.padding(12.dp)) {
-                        if (currentProfile.skills.isBlank()) {
-                            Text("Ajoutez vos technos favorites !", fontSize = 11.sp)
-                        } else {
-                            Row {
-                                currentProfile.skills.split(",").forEach { skill ->
-                                    Surface(
-                                        shape = RoundedCornerShape(6.dp),
-                                        color = colors.primary.copy(alpha = 0.12f),
-                                        modifier = Modifier.padding(end = 6.dp, bottom = 4.dp)
-                                    ) {
-                                        Text(
-                                            skill.trim(), 
-                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp), 
-                                            fontSize = 11.sp,
-                                            color = colors.primary,
-                                            fontWeight = FontWeight.Bold
+                        Box(modifier = Modifier.weight(1f)) {
+                            when (currentProfileTab) {
+                                0 -> {
+                                    Column(modifier = Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState())) {
+                                        CVContentLayout(profile = currentProfile, languageCode = languageCode, colors = colors)
+                                    }
+                                }
+                                1 -> {
+                                    Column(modifier = Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState())) {
+                                        LiveMembersLayout(
+                                            viewModel = viewModel,
+                                            profiles = profiles,
+                                            currentProfile = currentProfile,
+                                            followingEmails = followingEmails,
+                                            simulationEnabled = simulationEnabled,
+                                            languageCode = languageCode,
+                                            colors = colors,
+                                            onViewCv = { clickedProf -> selectedProfileForCv = clickedProf }
                                         )
                                     }
                                 }
@@ -2521,43 +2551,157 @@ fun ProfileScreen(viewModel: DevGabonViewModel, isTablet: Boolean) {
                         }
                     }
                 }
+            } else {
+                // Mobile Layout: Fluid, highly optimized linear layout
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(androidx.compose.foundation.rememberScrollState())
+                        .padding(16.dp)
+                ) {
+                    // Header ribbon
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(80.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(
+                                Brush.linearGradient(
+                                    colors = listOf(Color(0xFF10B981), Color(0xFFF59E0B), Color(0xFF0EA5E9))
+                                )
+                            )
+                    )
 
-                Spacer(Modifier.height(16.dp))
+                    // Profile summary overlapping slightly
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.offset(y = (-24).dp),
+                            verticalAlignment = Alignment.Bottom
+                        ) {
+                            ProfileImage(
+                                picture = currentProfile.profilePicture,
+                                modifier = Modifier.border(3.dp, colors.background, CircleShape),
+                                size = 68.dp
+                            )
+                            Spacer(Modifier.width(12.dp))
+                            Column(modifier = Modifier.padding(bottom = 4.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(currentProfile.fullName, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                    if (currentProfile.isVerified) {
+                                        Icon(Icons.Default.Verified, "Verified Badge", tint = colors.tertiary, modifier = Modifier.size(16.dp).padding(start = 4.dp))
+                                    }
+                                }
+                                Text("@${currentProfile.pseudo} • ${currentProfile.city}, Gabon", fontSize = 12.sp, color = colors.onSurfaceVariant)
+                                Spacer(Modifier.height(2.dp))
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.Email, "Email", tint = colors.primary, modifier = Modifier.size(12.dp))
+                                    Spacer(Modifier.width(4.dp))
+                                    Text(currentProfile.email, fontSize = 11.sp, color = colors.primary, fontWeight = FontWeight.SemiBold)
+                                }
+                            }
+                        }
+                    }
 
-                // Portfolio integration
-                Text("Portfolio & Liens Pros", fontWeight = FontWeight.Black, color = colors.primary, style = MaterialTheme.typography.titleMedium)
-                Spacer(Modifier.height(6.dp))
-                Column {
-                    ProfileLinkItem(icon = "🌐", text = currentProfile.portfolioUrl, placeholder = "Site web personnel", onClick = {})
+                    // Account settings actions
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp).offset(y = (-12).dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row {
+                            if (currentProfile.isPro) {
+                                Surface(shape = RoundedCornerShape(6.dp), color = colors.primary.copy(alpha = 0.15f), modifier = Modifier.padding(end = 4.dp)) {
+                                    Text("⭐ PRO DEV", modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp), fontSize = 10.sp, fontWeight = FontWeight.Bold, color = colors.primary)
+                                }
+                            }
+                            if (currentProfile.isRecruiter) {
+                                Surface(shape = RoundedCornerShape(6.dp), color = colors.secondary.copy(alpha = 0.15f)) {
+                                    Text("🏢 RECRUTEUR RH", modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp), fontSize = 10.sp, fontWeight = FontWeight.Bold, color = colors.secondary)
+                                }
+                            }
+                        }
+
+                        Row {
+                            Button(
+                                onClick = { isEditing = true },
+                                colors = ButtonDefaults.buttonColors(containerColor = colors.primary),
+                                modifier = Modifier.padding(end = 4.dp),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Icon(Icons.Default.Edit, "Modifier", modifier = Modifier.size(14.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text("Mon CV", fontSize = 11.sp)
+                            }
+
+                            OutlinedButton(
+                                onClick = { viewModel.logout() },
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = colors.error),
+                                border = BorderStroke(1.dp, colors.error.copy(alpha = 0.5f)),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Icon(Icons.Default.ExitToApp, "Logout", modifier = Modifier.size(14.dp))
+                                Spacer(Modifier.width(2.dp))
+                                Text(if (languageCode == "FR") "Quitter" else "Sign Out", fontSize = 11.sp)
+                            }
+                        }
+                    }
+
                     Spacer(Modifier.height(4.dp))
-                    ProfileLinkItem(icon = "🐙", text = currentProfile.githubUrl, placeholder = "Lien GitHub", onClick = {})
-                    Spacer(Modifier.height(4.dp))
-                    ProfileLinkItem(icon = "💼", text = currentProfile.linkedinUrl, placeholder = "Lien LinkedIn", onClick = {})
-                }
 
-                Spacer(Modifier.height(24.dp))
-                HorizontalDivider(color = colors.outline.copy(alpha = 0.2f))
-                Spacer(Modifier.height(16.dp))
-
-                // Mock test account switcher (Allows testing different roles easily!)
-                Text("Simuler d'autres comptes (Démo)", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
-                Spacer(Modifier.height(4.dp))
-                Text("Basculez entre développeur, designer, ou recruteur de Moov Africa pour tester les parcours sécurisés.", fontSize = 11.sp, color = colors.onSurfaceVariant)
-                Spacer(Modifier.height(8.dp))
-                
-                LazyRow {
-                    items(profiles) { prof ->
-                        val isCurrent = prof.email == currentProfile.email
-                        FilterChip(
-                            selected = isCurrent,
-                            onClick = { viewModel.switchActiveProfile(prof.email) },
-                            label = { Text("${prof.profilePicture} ${prof.fullName.split(" ").first()}") },
-                            modifier = Modifier.padding(end = 6.dp)
+                    // Tab layouts bar
+                    TabRow(
+                        selectedTabIndex = currentProfileTab,
+                        containerColor = colors.background,
+                        contentColor = colors.primary,
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    ) {
+                        Tab(
+                            selected = currentProfileTab == 0,
+                            onClick = { currentProfileTab = 0 },
+                            text = { Text(if (languageCode == "FR") "Mon CV & Parcours" else "Developer CV", fontSize = 12.sp, fontWeight = FontWeight.Bold) },
+                            icon = { Icon(Icons.Default.ContactPage, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                        )
+                        Tab(
+                            selected = currentProfileTab == 1,
+                            onClick = { currentProfileTab = 1 },
+                            text = { Text(if (languageCode == "FR") "Direct (${profiles.count { it.isOnline }}/${profiles.size})" else "Live (${profiles.count { it.isOnline }}/${profiles.size})", fontSize = 11.sp, fontWeight = FontWeight.Bold) },
+                            icon = { Icon(Icons.Default.LeakAdd, contentDescription = null, modifier = Modifier.size(16.dp)) }
                         )
                     }
+
+                    when (currentProfileTab) {
+                        0 -> {
+                            CVContentLayout(profile = currentProfile, languageCode = languageCode, colors = colors)
+                        }
+                        1 -> {
+                            LiveMembersLayout(
+                                viewModel = viewModel,
+                                profiles = profiles,
+                                currentProfile = currentProfile,
+                                followingEmails = followingEmails,
+                                simulationEnabled = simulationEnabled,
+                                languageCode = languageCode,
+                                colors = colors,
+                                onViewCv = { clickedProf -> selectedProfileForCv = clickedProf }
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(40.dp))
                 }
-                Spacer(Modifier.height(40.dp))
             }
+        }
+
+        // Render detailed resume overlay card if a user is clicked
+        selectedProfileForCv?.let { clickedProfile ->
+            MemberCVDetailsDialog(
+                profile = clickedProfile,
+                languageCode = languageCode,
+                onDismiss = { selectedProfileForCv = null }
+            )
         }
     }
 }
@@ -2582,6 +2726,624 @@ fun ProfileLinkItem(icon: String, text: String, placeholder: String, onClick: ()
             Text(icon, fontSize = 16.sp)
             Spacer(Modifier.width(12.dp))
             Text(text.ifBlank { placeholder }, fontSize = 12.sp, color = if (text.isBlank()) colors.onSurfaceVariant else colors.primary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+    }
+}
+
+@Composable
+fun CVContentLayout(profile: UserProfileEntity, languageCode: String, colors: ColorScheme) {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        // Bio Header Card in resume theme style
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = colors.primary.copy(alpha = 0.03f)),
+            shape = RoundedCornerShape(12.dp),
+            border = BorderStroke(1.dp, colors.primary.copy(alpha = 0.08f))
+        ) {
+            Column(Modifier.padding(14.dp)) {
+                Text(
+                    text = "${profile.role} • ${profile.experienceLevel}",
+                    fontWeight = FontWeight.Black,
+                    color = colors.primary,
+                    fontSize = 13.sp
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = profile.bio.ifBlank { if (languageCode == "FR") "Aucun paragraphe de présentation défini." else "No bio provided." },
+                    fontSize = 12.sp,
+                    lineHeight = 17.sp,
+                    color = colors.onSurface
+                )
+                
+                Spacer(Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceAround
+                ) {
+                    ProfileStatItem(num = profile.postCount.toString(), label = "Posts")
+                    ProfileStatItem(num = profile.articleCount.toString(), label = "Tutos")
+                    ProfileStatItem(num = profile.subscriberCount.toString(), label = "Abonnés")
+                }
+            }
+        }
+
+        // Categorized Technical Core Skills
+        Text(
+            text = if (languageCode == "FR") "Compétences Techniques Clés" else "Core Engineering Skills",
+            fontWeight = FontWeight.Bold,
+            color = colors.primary,
+            fontSize = 13.sp,
+            modifier = Modifier.padding(horizontal = 4.dp)
+        )
+        
+        val skList = profile.skills.split(",").map { it.trim() }.filter { it.isNotBlank() }
+        val mobileWeb = skList.filter { 
+            val s = it.lowercase()
+            s.contains("kotlin") || s.contains("compose") || s.contains("flutter") || s.contains("swift") || 
+            s.contains("figma") || s.contains("adobe") || s.contains("ux") || s.contains("ui") || s.contains("design") ||
+            s.contains("web") || s.contains("front") || s.contains("react") || s.contains("html") || s.contains("css") || s.contains("js")
+        }
+        val backendCloud = skList.filter { 
+            val s = it.lowercase()
+            s.contains("nest") || s.contains("node") || s.contains("spring") || s.contains("api") || s.contains("django") || 
+            s.contains("aws") || s.contains("docker") || s.contains("kubernetes") || s.contains("cloud") || s.contains("cyber") || s.contains("sec") || s.contains("linux") || s.contains("ansible")
+        }
+        val restSkills = skList.filter { !mobileWeb.contains(it) && !backendCloud.contains(it) }
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = colors.surface),
+            shape = RoundedCornerShape(12.dp),
+            border = BorderStroke(1.dp, colors.outline.copy(alpha = 0.08f))
+        ) {
+            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                if (skList.isEmpty()) {
+                    Text(
+                        text = if (languageCode == "FR") "Aucune compétence n'a été répertoriée." else "No technical skills listed.",
+                        fontSize = 11.sp,
+                        color = colors.onSurfaceVariant
+                    )
+                } else {
+                    if (mobileWeb.isNotEmpty()) {
+                        SkillGroupRow(title = "UIs, Mobile & Web Frontends", skills = mobileWeb, colors = colors, accentColor = Color(0xFF10B981))
+                    }
+                    if (backendCloud.isNotEmpty()) {
+                        SkillGroupRow(title = "APIs, System Services & Cloud", skills = backendCloud, colors = colors, accentColor = Color(0xFF3B82F6))
+                    }
+                    if (restSkills.isNotEmpty()) {
+                        SkillGroupRow(title = "Autres Stack DevOps & Outils", skills = restSkills, colors = colors, accentColor = Color(0xFFF59E0B))
+                    }
+                }
+            }
+        }
+
+        // Timeline of customized Career Achievements
+        Text(
+            text = if (languageCode == "FR") "Expériences Professionnelles" else "Engineering Career Timeline",
+            fontWeight = FontWeight.Bold,
+            color = colors.primary,
+            fontSize = 13.sp,
+            modifier = Modifier.padding(horizontal = 4.dp)
+        )
+        
+        ProfessionalTimeline(
+            level = profile.experienceLevel,
+            skills = profile.skills,
+            languageCode = languageCode,
+            colors = colors
+        )
+
+        // Educations & Diplômes
+        Text(
+            text = if (languageCode == "FR") "Études & Diplômes Informatiques" else "Education history",
+            fontWeight = FontWeight.Bold,
+            color = colors.primary,
+            fontSize = 13.sp,
+            modifier = Modifier.padding(horizontal = 4.dp)
+        )
+        
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = colors.surface),
+            shape = RoundedCornerShape(12.dp),
+            border = BorderStroke(1.dp, colors.outline.copy(alpha = 0.08f))
+        ) {
+            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                EducationItem(
+                    year = "2021 - 2024",
+                    school = if (profile.city == "Libreville" || profile.city.isBlank()) "Institut National des Sciences de Gestion (INSG), Libreville" else "Campus Universitaire de ${profile.city}",
+                    degree = if (languageCode == "FR") "Master de Spécialité en Conception Logicielle" else "Master in Software Engineering & Architecture",
+                    colors = colors
+                )
+                HorizontalDivider(color = colors.outline.copy(alpha = 0.05f))
+                EducationItem(
+                    year = "2018 - 2021",
+                    school = "École Nationale de l'Informatique (ENI) du Gabon, Libreville",
+                    degree = if (languageCode == "FR") "Licence Académique en Administration Systèmes & Réseaux" else "B.S. in Computer Systems Administration",
+                    colors = colors
+                )
+            }
+        }
+
+        // Portfolio & networks and social profiles
+        Text(
+            text = if (languageCode == "FR") "Présence Numérique & Portfolio" else "Social Connections",
+            fontWeight = FontWeight.Bold,
+            color = colors.primary,
+            fontSize = 13.sp,
+            modifier = Modifier.padding(horizontal = 4.dp)
+        )
+        
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            ProfileLinkItem(icon = "🌐", text = profile.portfolioUrl, placeholder = "Portfolio personnel et sites web", onClick = {})
+            ProfileLinkItem(icon = "🐙", text = profile.githubUrl, placeholder = "Dépôt de projets publics GitHub", onClick = {})
+            ProfileLinkItem(icon = "💼", text = profile.linkedinUrl, placeholder = "Profil de recrutement LinkedIn", onClick = {})
+        }
+    }
+}
+
+@Composable
+fun SkillGroupRow(title: String, skills: List<String>, colors: ColorScheme, accentColor: Color) {
+    Column {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(6.dp).background(accentColor, CircleShape))
+            Spacer(Modifier.width(6.dp))
+            Text(title, fontSize = 10.sp, fontWeight = FontWeight.ExtraBold, color = colors.onSurfaceVariant)
+        }
+        Spacer(Modifier.height(4.dp))
+        FlowRow {
+            skills.forEach { sk ->
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = colors.primary.copy(alpha = 0.08f),
+                    modifier = Modifier.padding(end = 4.dp, bottom = 4.dp)
+                ) {
+                    Text(
+                        text = sk,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = colors.primary
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun FlowRow(
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.Start),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(
+            modifier = Modifier.horizontalScroll(androidx.compose.foundation.rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            content()
+        }
+    }
+}
+
+@Composable
+fun ProfessionalTimeline(level: String, skills: String, languageCode: String, colors: ColorScheme) {
+    val timelineData = remember(level, skills) {
+        when (level) {
+            "Junior" -> listOf(
+                Triple("2023 - Présent", "Développeur Logiciel Mobile Jr", "Conception d'interfaces utilisateurs fluides avec Kotlin et Compose. Résolution d'anomalies de code et intégration progressive de services web REST."),
+                Triple("2022 - 2023", "Développeur Web Stagiaire", "Prise en main des méthodologies agiles, découverte de l'univers de l'intégration continue et écriture de cas de tests.")
+            )
+            "Intermédiaire" -> listOf(
+                Triple("2022 - Présent", "Ingénieur d'Application Full Stack", "Développement d'APIs transactionnelles sécurisées et implémentation d'UIs dynamiques de production. Refactorisation de bases de données relationnelles locales."),
+                Triple("2020 - 2022", "Développeur Solutions IT polyvalent", "Responsable du déploiement opérationnel d'interfaces pour le secteur public et privé gabonais.")
+            )
+            "Senior" -> listOf(
+                Triple("2021 - Présent", "Tech Lead & Manager Technique", "Supervision d'équipes agiles gabonnaises, audits réguliers de sécurité applicative et modélisation de plans de déploiement cloud résilients."),
+                Triple("2018 - 2021", "Développeur Logiciel Principal Mobile", "Prise en charge complète de la conception technique à la mise en ligne d'applications pour divers secteurs locaux d'envergure.")
+            )
+            else -> listOf( // Expert
+                Triple("2020 - Présent", "Architecte Solutions Principal & Consultant", "Définition de stratégies technologiques à haut impact. Accompagnement de grandes entités locales pour le passage à l'échelle d'infrastructures informatiques."),
+                Triple("2015 - 2020", "Directeur Technique d'Engineering", "Encadrement, mentorat et recrutement d'ingénieurs au Gabon. Évangélisation de Kotlin et des architectures modernes.")
+            )
+        }
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = colors.surface),
+        shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(1.dp, colors.outline.copy(alpha = 0.08f))
+    ) {
+        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            timelineData.forEachIndexed { index, (period, title, desc) ->
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.padding(top = 2.dp, end = 10.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .background(colors.primary, CircleShape)
+                        )
+                        if (index < timelineData.size - 1) {
+                            Box(
+                                modifier = Modifier
+                                    .width(2.dp)
+                                    .height(55.dp)
+                                    .background(colors.outline.copy(alpha = 0.15f))
+                            )
+                        }
+                    }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(period, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = colors.onSurfaceVariant)
+                        Text(title, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = colors.primary)
+                        Spacer(Modifier.height(2.dp))
+                        Text(desc, fontSize = 11.sp, lineHeight = 15.sp, color = colors.onSurfaceVariant)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun EducationItem(year: String, school: String, degree: String, colors: ColorScheme) {
+    Column {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(degree, fontWeight = FontWeight.Bold, fontSize = 11.sp, color = colors.primary)
+            Text(year, fontSize = 9.sp, fontWeight = FontWeight.SemiBold, color = colors.onSurfaceVariant)
+        }
+        Spacer(Modifier.height(2.dp))
+        Text(school, fontSize = 10.sp, color = colors.onSurfaceVariant)
+    }
+}
+
+@Composable
+fun LiveMembersLayout(
+    viewModel: DevGabonViewModel,
+    profiles: List<UserProfileEntity>,
+    currentProfile: UserProfileEntity,
+    followingEmails: Set<String>,
+    simulationEnabled: Boolean,
+    languageCode: String,
+    colors: ColorScheme,
+    onViewCv: (UserProfileEntity) -> Unit
+) {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        // Real-time Traffic Simulator controls card
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.cardColors(containerColor = colors.tertiaryContainer.copy(alpha = 0.35f)),
+            border = BorderStroke(1.dp, colors.tertiary.copy(alpha = 0.15f))
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .background(
+                                    color = if (simulationEnabled) Color(0xFF10B981) else Color.Gray,
+                                    shape = CircleShape
+                                )
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = if (simulationEnabled) "Trafic en direct : ACTIF 🟢" else "Trafic en direct : PAUSE 🔘",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = colors.onTertiaryContainer
+                        )
+                    }
+                    
+                    Switch(
+                        checked = simulationEnabled,
+                        onCheckedChange = { viewModel.toggleOnlineSimulation() }
+                    )
+                }
+                
+                Text(
+                    text = if (languageCode == "FR") 
+                        "Le simulateur connecte et déconnecte des profils gabonais de façon aléatoire toutes les 6.5 secondes pour simuler le trafic de l'application." 
+                        else "Simulates real-time application traffic by toggling user online status in database every 6.5s.",
+                    fontSize = 10.sp,
+                    color = colors.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 4.dp, bottom = 8.dp)
+                )
+                
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Button(
+                        onClick = { viewModel.triggerRandomConnectionEvent() },
+                        colors = ButtonDefaults.buttonColors(containerColor = colors.tertiary),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.height(28.dp)
+                    ) {
+                        Icon(Icons.Default.Bolt, "Force", modifier = Modifier.size(12.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("Déclencher une connexion", fontSize = 9.sp)
+                    }
+                    
+                    Surface(
+                        color = colors.onTertiaryContainer.copy(alpha = 0.12f),
+                        shape = RoundedCornerShape(4.dp)
+                    ) {
+                        Text(
+                            text = "En ligne: ${profiles.count { it.isOnline }} / ${profiles.size}",
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
+                            color = colors.tertiary
+                        )
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(4.dp))
+
+        Text(
+            text = if (languageCode == "FR") "Rechercher des membres (Temps réel)" else "Live Search Community Members",
+            fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.titleSmall,
+            color = colors.primary
+        )
+        
+        var liveMemberQuery by remember { mutableStateOf("") }
+        OutlinedTextField(
+            value = liveMemberQuery,
+            onValueChange = { liveMemberQuery = it },
+            placeholder = { Text(if (languageCode == "FR") "Filtrer par nom, pseudo, rôle, ou techno..." else "Filter by name, skills...", fontSize = 11.sp) },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(8.dp),
+            leadingIcon = { Icon(Icons.Default.Search, contentDescription = "", modifier = Modifier.size(16.dp)) }
+        )
+
+        val filteredLiveProfiles = profiles.filter {
+            it.fullName.contains(liveMemberQuery, ignoreCase = true) ||
+            it.pseudo.contains(liveMemberQuery, ignoreCase = true) ||
+            it.role.contains(liveMemberQuery, ignoreCase = true) ||
+            it.skills.contains(liveMemberQuery, ignoreCase = true)
+        }
+
+        Column(
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            filteredLiveProfiles.forEach { prof ->
+                val isSelf = prof.email == currentProfile.email
+                val isFollowing = followingEmails.contains(prof.email)
+
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (isSelf) colors.primary.copy(alpha = 0.05f) else colors.surfaceVariant.copy(alpha = 0.15f)
+                    ),
+                    border = if (isSelf) BorderStroke(1.dp, colors.primary.copy(alpha = 0.25f)) else null,
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                ProfileImage(picture = prof.profilePicture, size = 38.dp)
+                                Spacer(Modifier.width(10.dp))
+                                Column {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(prof.fullName, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                        if (prof.isVerified) {
+                                            Icon(Icons.Default.Verified, "Verified", tint = colors.tertiary, modifier = Modifier.size(13.dp).padding(start = 2.dp))
+                                        }
+                                    }
+                                    Text("@${prof.pseudo} • ${prof.role}", fontSize = 10.sp, color = colors.onSurfaceVariant)
+                                    
+                                    Spacer(Modifier.height(4.dp))
+                                    
+                                    // Live connected indicator
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(6.dp)
+                                                .background(
+                                                    color = if (prof.isOnline) Color(0xFF10B981) else Color.Gray,
+                                                    shape = CircleShape
+                                                )
+                                        )
+                                        Spacer(Modifier.width(6.dp))
+                                        Text(
+                                            text = if (prof.isOnline) "En ligne (Temps réel)" else "Hors ligne",
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = if (prof.isOnline) Color(0xFF10B981) else colors.onSurfaceVariant
+                                        )
+                                        Spacer(Modifier.width(8.dp))
+                                        Text(
+                                            text = "• ${prof.subscriberCount} abonnés",
+                                            fontSize = 9.sp,
+                                            color = colors.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            }
+
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                if (!isSelf) {
+                                    Button(
+                                        onClick = { viewModel.toggleFollow(prof.email) },
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = if (isFollowing) Color(0xFF10B981) else colors.primary
+                                        ),
+                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                        shape = RoundedCornerShape(6.dp),
+                                        modifier = Modifier.height(26.dp)
+                                    ) {
+                                        Text(
+                                            text = if (isFollowing) "Abonné ✓" else "+ S'abonner",
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                } else {
+                                    Surface(
+                                        color = colors.primary.copy(alpha = 0.12f),
+                                        shape = RoundedCornerShape(4.dp)
+                                    ) {
+                                        Text(
+                                            "Moi",
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = colors.primary
+                                        )
+                                    }
+                                }
+
+                                OutlinedButton(
+                                    onClick = { viewModel.switchActiveProfile(prof.email) },
+                                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
+                                    shape = RoundedCornerShape(6.dp),
+                                    modifier = Modifier.height(26.dp),
+                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = colors.secondary),
+                                    border = BorderStroke(1.dp, colors.secondary.copy(alpha = 0.4f))
+                                ) {
+                                    Icon(Icons.Default.Refresh, contentDescription = "Switch", modifier = Modifier.size(10.dp))
+                                    Spacer(Modifier.width(2.dp))
+                                    Text("Basculer", fontSize = 8.sp)
+                                }
+                            }
+                        }
+                        
+                        Spacer(Modifier.height(8.dp))
+                        HorizontalDivider(color = colors.outline.copy(alpha = 0.05f))
+                        Spacer(Modifier.height(6.dp))
+                        
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Tech: " + prof.skills.split(",").take(3).joinToString(", "),
+                                fontSize = 9.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                color = colors.onSurfaceVariant,
+                                modifier = Modifier.weight(1f)
+                            )
+                            
+                            Button(
+                                onClick = { onViewCv(prof) },
+                                colors = ButtonDefaults.buttonColors(containerColor = colors.primaryContainer, contentColor = colors.onPrimaryContainer),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                shape = RoundedCornerShape(6.dp),
+                                modifier = Modifier.height(24.dp)
+                            ) {
+                                Text("Consulter CV 📄", fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun MemberCVDetailsDialog(
+    profile: UserProfileEntity,
+    languageCode: String,
+    onDismiss: () -> Unit
+) {
+    val colors = MaterialTheme.colorScheme
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .fillMaxHeight(0.85f)
+                .padding(4.dp),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = colors.surface),
+            border = BorderStroke(1.dp, colors.outline.copy(alpha = 0.15f))
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(14.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        ProfileImage(picture = profile.profilePicture, size = 42.dp)
+                        Spacer(Modifier.width(10.dp))
+                        Column {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(profile.fullName, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                if (profile.isVerified) {
+                                    Icon(Icons.Default.Verified, "Verified", tint = colors.tertiary, modifier = Modifier.size(13.dp).padding(start = 2.dp))
+                                }
+                            }
+                            Text("@${profile.pseudo} • ${profile.city}, Gabon", fontSize = 10.sp, color = colors.onSurfaceVariant)
+                        }
+                    }
+                    IconButton(onClick = onDismiss, modifier = Modifier.size(32.dp)) {
+                        Icon(Icons.Default.Close, "Dismiss", modifier = Modifier.size(18.dp))
+                    }
+                }
+                
+                HorizontalDivider(color = colors.outline.copy(alpha = 0.08f))
+                Spacer(Modifier.height(10.dp))
+                
+                Box(modifier = Modifier.weight(1f)) {
+                    Column(modifier = Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState())) {
+                        CVContentLayout(profile = profile, languageCode = languageCode, colors = colors)
+                    }
+                }
+                
+                Spacer(Modifier.height(10.dp))
+                
+                Button(
+                    onClick = onDismiss,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(if (languageCode == "FR") "Fermer le profil CV" else "Close CV Profile", fontSize = 12.sp)
+                }
+            }
         }
     }
 }

@@ -113,7 +113,8 @@ class DevGabonRepository(
                             articleCount = (d["articleCount"] as? Long)?.toInt() ?: 0,
                             subscriberCount = (d["subscriberCount"] as? Long)?.toInt() ?: 0,
                             isVerified = d["isVerified"] as? Boolean ?: false,
-                            role = d["role"] as? String ?: "Développeur"
+                            role = d["role"] as? String ?: "Développeur",
+                            isOnline = d["isOnline"] as? Boolean ?: false
                         )
                         scope.launch { dao.insertProfile(profile) }
                     } catch (ex: Throwable) {
@@ -253,6 +254,25 @@ class DevGabonRepository(
     val notifications: Flow<List<NotificationEntity>> = dao.getAllNotifications()
 
     fun getProfile(email: String): Flow<UserProfileEntity?> = dao.getProfileByEmail(email)
+    
+    fun getFollows(email: String): Flow<List<FollowEntity>> = dao.getFollowsByFollower(email)
+    fun isFollowing(follower: String, followed: String): Flow<Boolean> = dao.isFollowing(follower, followed)
+
+    suspend fun followUser(followerEmail: String, followedEmail: String) {
+        val follow = FollowEntity(followerEmail, followedEmail)
+        dao.insertFollow(follow)
+        writeToFirestore("follows", "${followerEmail}_${followedEmail}", follow)
+    }
+
+    suspend fun unfollowUser(followerEmail: String, followedEmail: String) {
+        dao.deleteFollow(followerEmail, followedEmail)
+        try {
+            FirebaseFirestore.getInstance().collection("follows").document("${followerEmail}_${followedEmail}").delete()
+        } catch (e: Throwable) {
+            Log.e("FirebaseSync", "Failed to delete follow from Firestore", e)
+        }
+    }
+
     fun getComments(postId: Int): Flow<List<CommentEntity>> = dao.getCommentsForPost(postId)
     fun getMessagesForChat(p1: String, p2: String): Flow<List<MessageEntity>> = dao.getChatMessages(p1, p2)
     fun getPostsForGroup(groupName: String): Flow<List<PostEntity>> = dao.getPostsByGroup(groupName)
@@ -284,6 +304,7 @@ class DevGabonRepository(
         dao.clearEvents()
         dao.clearMessages()
         dao.clearNotifications()
+        dao.clearFollows()
         dao.clearProfiles()
 
         if (adminProfileToKeep != null) {
@@ -293,48 +314,57 @@ class DevGabonRepository(
     }
 
     suspend fun createPost(post: PostEntity) {
-        dao.insertPost(post)
-        writeToFirestore("posts", post.id.toString(), post)
+        val insertedId = dao.insertPost(post)
+        val finalPost = post.copy(id = insertedId.toInt())
+        writeToFirestore("posts", finalPost.id.toString(), finalPost)
     }
 
     suspend fun createComment(comment: CommentEntity) {
-        dao.insertComment(comment)
-        writeToFirestore("comments", comment.id.toString(), comment)
+        val insertedId = dao.insertComment(comment)
+        val finalComment = comment.copy(id = insertedId.toInt())
+        writeToFirestore("comments", finalComment.id.toString(), finalComment)
     }
 
     suspend fun createArticle(article: ArticleEntity) {
-        dao.insertArticle(article)
-        writeToFirestore("articles", article.id.toString(), article)
+        val insertedId = dao.insertArticle(article)
+        val finalArticle = article.copy(id = insertedId.toInt())
+        writeToFirestore("articles", finalArticle.id.toString(), finalArticle)
     }
 
     suspend fun createGroup(group: GroupEntity) {
-        dao.insertGroup(group)
-        writeToFirestore("groups", group.id.toString(), group)
+        val insertedId = dao.insertGroup(group)
+        val finalGroup = group.copy(id = insertedId.toInt())
+        writeToFirestore("groups", finalGroup.id.toString(), finalGroup)
     }
 
     suspend fun createJob(job: JobEntity) {
-        dao.insertJob(job)
-        writeToFirestore("jobs", job.id.toString(), job)
+        val insertedId = dao.insertJob(job)
+        val finalJob = job.copy(id = insertedId.toInt())
+        writeToFirestore("jobs", finalJob.id.toString(), finalJob)
     }
 
     suspend fun createProject(project: ProjectEntity) {
-        dao.insertProject(project)
-        writeToFirestore("projects", project.id.toString(), project)
+        val insertedId = dao.insertProject(project)
+        val finalProject = project.copy(id = insertedId.toInt())
+        writeToFirestore("projects", finalProject.id.toString(), finalProject)
     }
 
     suspend fun createEvent(event: EventEntity) {
-        dao.insertEvent(event)
-        writeToFirestore("events", event.id.toString(), event)
+        val insertedId = dao.insertEvent(event)
+        val finalEvent = event.copy(id = insertedId.toInt())
+        writeToFirestore("events", finalEvent.id.toString(), finalEvent)
     }
 
     suspend fun sendMessage(msg: MessageEntity) {
-        dao.insertMessage(msg)
-        writeToFirestore("messages", msg.id.toString(), msg)
+        val insertedId = dao.insertMessage(msg)
+        val finalMsg = msg.copy(id = insertedId.toInt())
+        writeToFirestore("messages", finalMsg.id.toString(), finalMsg)
     }
 
     suspend fun createNotification(notif: NotificationEntity) {
-        dao.insertNotification(notif)
-        writeToFirestore("notifications", notif.id.toString(), notif)
+        val insertedId = dao.insertNotification(notif)
+        val finalNotif = notif.copy(id = insertedId.toInt())
+        writeToFirestore("notifications", finalNotif.id.toString(), finalNotif)
     }
 
     suspend fun toggleLike(postId: Int, currentLiked: Boolean, currentLikes: Int) {
